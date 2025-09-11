@@ -2,7 +2,7 @@
 # Runs a step response scenario, saves CSV, PNG, and simple HTML report.
 # Exits with code 0 if gates pass, otherwise 1.
 
-import os, csv, math, json, sys
+import os, csv, json, sys
 from pathlib import Path
 import matplotlib.pyplot as plt
 
@@ -10,20 +10,16 @@ from src.model import FirstOrderTank
 from src.pid import PID
 from src.metrics import compute_metrics
 
+
 def getenv_float(key, default):
     try:
         return float(os.getenv(key, default))
     except Exception:
         return default
 
-def getenv_int(key, default):
-    try:
-        return int(os.getenv(key, default))
-    except Exception:
-        return default
 
 def main():
-    # Parameters from environment (ConfigMap / CI variables)
+    # Parameters from environment
     K = getenv_float("PLANT_K", 1.0)
     TAU = getenv_float("PLANT_TAU", 30.0)
     DT = getenv_float("SIM_DT", 0.05)
@@ -40,10 +36,10 @@ def main():
     R_FINAL = getenv_float("STEP_FINAL", 1.0)
     SETTLE_BAND = getenv_float("SETTLE_BAND", 0.02)
 
-    # Quality gates
+    # Quality gates (progi oceny)
     GATE_OVERSHOOT = getenv_float("GATE_MAX_OVERSHOOT_PCT", 15.0)
     GATE_TS_MULT_TAU = getenv_float("GATE_MAX_TS_MULT_TAU", 5.0)
-    GATE_IAE_MAX = getenv_float("GATE_MAX_IAE", 9999.0)
+    GATE_IAE_MAX = getenv_float("GATE_MAX_IAE", 50.0)
 
     out_dir = Path(os.getenv("OUT_DIR", "/out"))
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -55,13 +51,12 @@ def main():
     pid.reset()
 
     t, r, y, u, e = [], [], [], [], []
-
     steps = int(T_SIM / DT)
+
     for k in range(steps + 1):
         time = k * DT
-        ref = R_FINAL  # step
-        yy = plant.y
-        ctrl = pid.update(ref, yy)
+        ref = R_FINAL
+        ctrl = pid.update(ref, plant.y)
         y_next = plant.step(ctrl)
 
         t.append(time)
@@ -70,13 +65,14 @@ def main():
         u.append(ctrl)
         e.append(ref - y_next)
 
+    # Metrics
     m = compute_metrics(t, r, y, e, settle_band=SETTLE_BAND)
 
     # Save CSV
     csv_path = out_dir / "results.csv"
     with csv_path.open("w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["t","r","y","u","e"])
+        w.writerow(["t", "r", "y", "u", "e"])
         for i in range(len(t)):
             w.writerow([t[i], r[i], y[i], u[i], e[i]])
 
@@ -92,7 +88,7 @@ def main():
     plt.savefig(out_dir / "plot.png", dpi=120, bbox_inches="tight")
     plt.close()
 
-    # Report (very simple)
+    # JSON report
     report = {
         "plant": {"K": K, "tau": TAU},
         "pid": {"kp": KP, "ti": TI, "td": TD, "n": N, "umin": UMIN, "umax": UMAX, "kaw": KAW},
@@ -102,36 +98,40 @@ def main():
             "settling_time": m.settling_time,
             "overshoot_pct": m.overshoot_pct,
             "iae": m.iae,
-            "ise": m.ise
-        }
+            "ise": m.ise,
+        },
     }
     (out_dir / "report.json").write_text(json.dumps(report, indent=2))
 
-    # Gates
-    pass_gates = True
-    if m.overshoot_pct > GATE_OVERSHOOT:
-        pass_gates = False
-    if m.settling_time > GATE_TS_MULT_TAU * TAU:
-        pass_gates = False
-    if m.iae > GATE_IAE_MAX:
-        pass_gates = False
-
-    # Simple HTML
+    # HTML report
     html = f"""
     <html><body>
     <h2>Validation report</h2>
     <pre>{json.dumps(report, indent=2)}</pre>
     <img src="plot.png" width="640"/>
-    <p>Gates passed: {pass_gates}</p>
     </body></html>
     """
     (out_dir / "report.html").write_text(html)
 
-    if not pass_gates:
-        print("Quality gates FAILED")
+    # === Quality gates check ===
+    fail = False
+    if m.overshoot_pct > GATE_OVERSHOOT:
+        print(f"FAIL: overshoot {m.overshoot_pct:.2f} > {GATE_OVERSHOOT}")
+        fail = True
+    if m.settling_time > GATE_TS_MULT_TAU * TAU:
+        print(f"FAIL: settling_time {m.settling_time:.2f} > {GATE_TS_MULT_TAU * TAU}")
+        fail = True
+    if m.iae > GATE_IAE_MAX:
+        print(f"FAIL: IAE {m.iae:.2f} > {GATE_IAE_MAX}")
+        fail = True
+
+    if fail:
+        print("Quality gates FAILED ❌")
         sys.exit(1)
-    print("Quality gates PASSED")
-    sys.exit(0)
+    else:
+        print("Quality gates PASSED ✅")
+        sys.exit(0)
+
 
 if __name__ == "__main__":
     main()

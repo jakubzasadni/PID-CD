@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: CI Pipeline (Fail Demo)
 
 on:
   push:
@@ -52,18 +52,21 @@ jobs:
 
       - run: cat image.env >> $GITHUB_ENV
 
-      - name: Run validation with different PID configs
+      #Walidacja ze słabymi nastawami PID – pipeline ma failować
+      - name: Run validation (bad PID - should FAIL)
         run: |
           mkdir -p out
-          docker run --rm -e OUT_DIR=/out/run1 -e PID_KP=1.0 -e PID_TI=30.0 -v ${{ github.workspace }}/out:/out $IMAGE
-          docker run --rm -e OUT_DIR=/out/run2 -e PID_KP=2.0 -e PID_TI=20.0 -v ${{ github.workspace }}/out:/out $IMAGE
-          docker run --rm -e OUT_DIR=/out/run3 -e PID_KP=0.8 -e PID_TI=40.0 -v ${{ github.workspace }}/out:/out $IMAGE
-
-      - name: Collect metrics
-        run: |
-          python3 collect_metrics.py | tee out/summary.txt
+          docker run --rm \
+            -e OUT_DIR=/out \
+            -e PID_KP=0.2 \
+            -e PID_TI=100.0 \
+            -e GATE_MAX_OVERSHOOT_PCT=15.0 \
+            -e GATE_MAX_TS_MULT_TAU=5.0 \
+            -e GATE_MAX_IAE=50.0 \
+            -v ${{ github.workspace }}/out:/out $IMAGE
 
       - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: validation-results
