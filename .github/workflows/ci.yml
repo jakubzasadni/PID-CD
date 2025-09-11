@@ -28,9 +28,11 @@ jobs:
       - name: Build Docker image
         run: |
           IMAGE=ghcr.io/${{ github.repository }}/pid-sim:${{ github.sha }}
+          IMAGE=$(echo $IMAGE | tr '[:upper:]' '[:lower:]')
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
           docker build -t $IMAGE .
           docker push $IMAGE
+
 
   validate:
     runs-on: ubuntu-latest
