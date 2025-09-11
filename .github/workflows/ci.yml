@@ -52,10 +52,16 @@ jobs:
 
       - run: cat image.env >> $GITHUB_ENV
 
-      - name: Run validation inside container
+      - name: Run validation with different PID configs
         run: |
           mkdir -p out
-          docker run --rm -e OUT_DIR=/out -v ${{ github.workspace }}/out:/out $IMAGE
+          docker run --rm -e OUT_DIR=/out/run1 -e PID_KP=1.0 -e PID_TI=30.0 -v ${{ github.workspace }}/out:/out $IMAGE
+          docker run --rm -e OUT_DIR=/out/run2 -e PID_KP=2.0 -e PID_TI=20.0 -v ${{ github.workspace }}/out:/out $IMAGE
+          docker run --rm -e OUT_DIR=/out/run3 -e PID_KP=0.8 -e PID_TI=40.0 -v ${{ github.workspace }}/out:/out $IMAGE
+
+      - name: Collect metrics
+        run: |
+          python3 collect_metrics.py | tee out/summary.txt
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
