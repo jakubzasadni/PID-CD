@@ -6,9 +6,9 @@ import os, csv, math, json, sys
 from pathlib import Path
 import matplotlib.pyplot as plt
 
-from model import FirstOrderTank
-from pid import PID
-from metrics import compute_metrics
+from src.model import FirstOrderTank
+from src.pid import PID
+from src.metrics import compute_metrics
 
 def getenv_float(key, default):
     try:

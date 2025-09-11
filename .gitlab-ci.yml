@@ -1,0 +1,59 @@
+stages:
+  - build
+  - deploy
+  - validate
+
+variables:
+  DOCKER_DRIVER: overlay2
+  IMAGE_TAG: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+
+# 1) Build stage: budowanie obrazu i push do GitLab Container Registry
+build_image:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
+    - docker build -t "$IMAGE_TAG" .
+    - docker push "$IMAGE_TAG"
+  artifacts:
+    reports:
+      dotenv: build.env
+  after_script:
+    - echo "IMAGE=$IMAGE_TAG" >> build.env
+
+# 2) Deploy stage: wdrożenie obrazu do klastra (namespace, ConfigMap, Job)
+deploy_job:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  needs: ["build_image"]
+  before_script:
+    - echo "$KUBECONFIG" > kubeconfig.yaml
+    - export KUBECONFIG=$CI_PROJECT_DIR/kubeconfig.yaml
+  script:
+    - export IMAGE=$IMAGE_TAG
+    - apk add --no-cache bash gettext 2>/dev/null || true
+    - bash ./deploy/render.sh
+  artifacts:
+    paths:
+      - deploy/job.yaml
+      - deploy/configmap.yaml
+
+# 3) Validate stage: zebranie artefaktów z Job
+validate_results:
+  stage: validate
+  image: bitnami/kubectl:latest
+  needs: ["deploy_job"]
+  before_script:
+    - echo "$KUBECONFIG" > kubeconfig.yaml
+    - export KUBECONFIG=$CI_PROJECT_DIR/kubeconfig.yaml
+  script:
+    - NS=pid-sim-dev
+    - POD=$(kubectl -n $NS get pods -l job-name=pid-sim-validate -o jsonpath='{.items[0].metadata.name}')
+    - kubectl -n $NS cp "$POD:/out" ".out"
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - .out/
