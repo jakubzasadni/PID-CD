@@ -6,9 +6,6 @@ on:
   pull_request:
     branches: ["main"]
 
-env:
-  IMAGE: ghcr.io/${{ github.repository }}/pid-sim:${{ github.sha }}
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,10 +25,18 @@ jobs:
 
       - name: Build Docker image
         run: |
+          IMAGE=ghcr.io/${{ github.repository }}/pid-sim:${{ github.sha }}
           IMAGE=$(echo $IMAGE | tr '[:upper:]' '[:lower:]')
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+          echo "IMAGE=$IMAGE" >> image.env
           docker build -t $IMAGE .
           docker push $IMAGE
+
+      - name: Save IMAGE as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-env
+          path: image.env
 
   validate:
     runs-on: ubuntu-latest
@@ -39,6 +44,13 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
+
+      - name: Load IMAGE from artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: image-env
+
+      - run: cat image.env >> $GITHUB_ENV
 
       - name: Run validation inside container
         run: |
