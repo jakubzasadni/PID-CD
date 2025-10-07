@@ -1,7 +1,8 @@
 # src/uruchom_symulacje.py
 """
-Główny skrypt integrujący strojenie, walidację i raportowanie.
-Dodano progi jakości (quality gates) dla automatycznej oceny PASS/FAIL.
+Symulacja i walidacja dla wielu modeli procesów.
+Każda metoda strojenia testowana na wszystkich modelach.
+Dodano progi jakości oraz walidację PASS/FAIL.
 """
 
 import os
@@ -14,38 +15,35 @@ from src.strojenie.wykonaj_strojenie import wykonaj_strojenie
 
 
 def dynamiczny_import(typ: str, nazwa: str):
-    """
-    Dynamicznie importuje klasę modelu lub regulatora.
-    """
     modul = importlib.import_module(f"src.{typ}.{nazwa}")
-    klasa = None
     for attr in dir(modul):
         if attr.lower() == nazwa.lower():
-            klasa = getattr(modul, attr)
-            break
-    if klasa is None:
-        klasa = getattr(modul, [a for a in dir(modul) if not a.startswith("_")][0])
-    return klasa
+            return getattr(modul, attr)
+    return getattr(modul, [a for a in dir(modul) if not a.startswith("_")][0])
 
 
 def uruchom_symulacje():
-    """Główna pętla symulacji."""
-    model_nazwa = os.getenv("MODEL", "zbiornik_1rz")
+    """Główna funkcja symulacji."""
     regulator_nazwa = os.getenv("REGULATOR", "regulator_pid")
     czas_sym = float(os.getenv("CZAS_SYM", 60.0))
     dt = float(os.getenv("DT", 0.05))
-    tryb = os.getenv("TRYB", "strojenie")  # "strojenie" lub "walidacja"
+    tryb = os.getenv("TRYB", "strojenie")
     out_dir = os.getenv("OUT_DIR", "wyniki")
-
     os.makedirs(out_dir, exist_ok=True)
 
-    # --- Definicja progów jakości ---
+    # --- Dostępne modele ---
+    modele = [
+        "zbiornik_1rz",    # układ pierwszego rzędu
+        "piec_1rz",        # obiekt cieplny
+        "silnik_dc"        # model silnika prądu stałego
+    ]
+
+    # --- Progi jakości ---
     prog_overshoot = float(os.getenv("GATE_MAX_OVERSHOOT_PCT", 15.0))
     prog_settling = float(os.getenv("GATE_MAX_SETTLING_TIME", 30.0))
     prog_iae = float(os.getenv("GATE_MAX_IAE", 50.0))
     prog_ise = float(os.getenv("GATE_MAX_ISE", 100.0))
 
-    # --- Tryb strojenia regulatora ---
     if tryb == "strojenie":
         for metoda in ["ziegler_nichols", "siatka", "optymalizacja"]:
             parametry = wykonaj_strojenie(metoda)
@@ -54,85 +52,93 @@ def uruchom_symulacje():
         print("✅ Zakończono strojenie wszystkich metod.")
         return
 
-    # --- Tryb walidacji regulatora ---
     elif tryb == "walidacja":
         metody = [f for f in os.listdir(out_dir) if f.startswith("parametry_")]
         if not metody:
             print("⚠️ Brak plików parametrów w katalogu:", out_dir)
             return
 
+        all_pass = False  # globalny status walidacji
+
         for plik in metody:
             metoda = plik.split("_")[1].split(".")[0]
             with open(os.path.join(out_dir, plik), "r") as f:
                 parametry = json.load(f)
 
-            # Dynamiczny import modelu i regulatora
-            Model = dynamiczny_import("modele", model_nazwa)
-            Regulator = dynamiczny_import("regulatory", regulator_nazwa)
-            model = Model(dt=dt)
-            regulator = Regulator(**parametry, dt=dt)
+            for model_nazwa in modele:
+                print(f"🔍 Testowanie metody {metoda} na modelu {model_nazwa}...")
 
-            kroki = int(czas_sym / dt)
-            t, r, y, u = [], [], [], []
-            for k in range(kroki):
-                t.append(k * dt)
-                r_zad = 1.0
-                y_k = model.y
-                u_k = regulator.update(r_zad, y_k)
-                y_nowe = model.step(u_k)
-                r.append(r_zad)
-                y.append(y_nowe)
-                u.append(u_k)
+                Model = dynamiczny_import("modele", model_nazwa)
+                Regulator = dynamiczny_import("regulatory", regulator_nazwa)
+                model = Model(dt=dt)
+                regulator = Regulator(**parametry, dt=dt)
 
-            # Obliczenie metryk jakości
-            wyniki = oblicz_metryki(t, r, y)
+                kroki = int(czas_sym / dt)
+                t, r, y, u = [], [], [], []
+                for k in range(kroki):
+                    t.append(k * dt)
+                    r_zad = 1.0
+                    y_k = model.y
+                    u_k = regulator.update(r_zad, y_k)
+                    y_nowe = model.step(u_k)
+                    r.append(r_zad)
+                    y.append(y_nowe)
+                    u.append(u_k)
 
-            # --- Ocena wg progów jakości ---
-            pass_gates = True
-            if wyniki.przeregulowanie > prog_overshoot:
-                pass_gates = False
-            if wyniki.czas_ustalania > prog_settling:
-                pass_gates = False
-            if wyniki.IAE > prog_iae:
-                pass_gates = False
-            if wyniki.ISE > prog_ise:
-                pass_gates = False
+                wyniki = oblicz_metryki(t, r, y)
 
-            raport = {
-                "model": model_nazwa,
-                "regulator": regulator_nazwa,
-                "metoda": metoda,
-                "metryki": wyniki.__dict__,
-                "progi": {
-                    "overshoot_max": prog_overshoot,
-                    "settling_max": prog_settling,
-                    "IAE_max": prog_iae,
-                    "ISE_max": prog_ise
-                },
-                "PASS": pass_gates
-            }
+                # --- Sprawdzenie progów jakości ---
+                pass_gates = True
+                if wyniki.przeregulowanie > prog_overshoot:
+                    pass_gates = False
+                if wyniki.czas_ustalania > prog_settling:
+                    pass_gates = False
+                if wyniki.IAE > prog_iae:
+                    pass_gates = False
+                if wyniki.ISE > prog_ise:
+                    pass_gates = False
 
-            # Zapis raportu JSON
-            raport_path = os.path.join(out_dir, f"raport_{metoda}.json")
-            with open(raport_path, "w") as f:
-                json.dump(raport, f, indent=2)
+                raport = {
+                    "model": model_nazwa,
+                    "regulator": regulator_nazwa,
+                    "metoda": metoda,
+                    "metryki": wyniki.__dict__,
+                    "progi": {
+                        "overshoot_max": prog_overshoot,
+                        "settling_max": prog_settling,
+                        "IAE_max": prog_iae,
+                        "ISE_max": prog_ise
+                    },
+                    "PASS": pass_gates
+                }
 
-            # Wykres odpowiedzi skokowej
-            plt.figure()
-            plt.plot(t, r, label="wartość zadana (r)")
-            plt.plot(t, y, label="odpowiedź układu (y)")
-            plt.plot(t, u, label="sterowanie (u)")
-            plt.xlabel("Czas [s]")
-            plt.legend()
-            plt.title(f"{metoda.upper()} — {model_nazwa} ({'PASS' if pass_gates else 'FAIL'})")
-            plt.savefig(os.path.join(out_dir, f"wykres_{metoda}.png"), dpi=120, bbox_inches="tight")
-            plt.close()
+                # Zapis raportu JSON
+                raport_path = os.path.join(out_dir, f"raport_{metoda}_{model_nazwa}.json")
+                with open(raport_path, "w") as f:
+                    json.dump(raport, f, indent=2)
 
-            # Log statusu
-            status = "✅" if pass_gates else "❌"
-            print(f"{status} Metoda {metoda} — IAE={wyniki.IAE:.2f}, overshoot={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s")
+                # Wykres
+                plt.figure()
+                plt.plot(t, r, label="wartość zadana (r)")
+                plt.plot(t, y, label="odpowiedź układu (y)")
+                plt.plot(t, u, label="sterowanie (u)")
+                plt.xlabel("Czas [s]")
+                plt.legend()
+                plt.title(f"{metoda.upper()} — {model_nazwa} ({'PASS' if pass_gates else 'FAIL'})")
+                plt.savefig(os.path.join(out_dir, f"wykres_{metoda}_{model_nazwa}.png"), dpi=120)
+                plt.close()
 
-        print("✅ Zakończono walidację wszystkich metod.")
+                status = "✅" if pass_gates else "❌"
+                print(f"{status} {metoda.upper()} — {model_nazwa}: IAE={wyniki.IAE:.2f}, Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s")
+
+                if pass_gates:
+                    all_pass = True
+
+        if not all_pass:
+            print("❌ Żaden regulator nie spełnił progów jakości.")
+            exit(1)
+
+        print("✅ Wszystkie testy modeli zakończone. Wyniki zapisano.")
         return
 
     else:
