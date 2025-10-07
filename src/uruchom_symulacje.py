@@ -8,6 +8,7 @@ Dodano progi jakości oraz walidację PASS/FAIL.
 import os
 import importlib
 import json
+import inspect
 import numpy as np
 import matplotlib.pyplot as plt
 from src.metryki import oblicz_metryki
@@ -15,6 +16,7 @@ from src.strojenie.wykonaj_strojenie import wykonaj_strojenie
 
 
 def dynamiczny_import(typ: str, nazwa: str):
+    """Dynamicznie importuje klasę modelu lub regulatora."""
     modul = importlib.import_module(f"src.{typ}.{nazwa}")
     for attr in dir(modul):
         if attr.lower() == nazwa.lower():
@@ -32,16 +34,18 @@ def uruchom_symulacje():
     os.makedirs(out_dir, exist_ok=True)
 
     # --- Dostępne modele ---
-    progi_modele = {
-        "zbiornik_1rz": {"ts": 60.0, "IAE": 50.0, "Mp": 15.0},
-        "dwa_zbiorniki": {"ts": 80.0, "IAE": 80.0, "Mp": 20.0},
-        "wahadlo_odwrocone": {"ts": 60.0, "IAE": 20000.0, "Mp": 70000.0}
-    }
+    modele = [
+        "zbiornik_1rz",
+        "dwa_zbiorniki",
+        "wahadlo_odwrocone"
+    ]
 
-    # --- Progi jakości ---
-    prog_settling = progi_modele[model_nazwa]["ts"]
-    prog_iae = progi_modele[model_nazwa]["IAE"]
-    prog_overshoot = progi_modele[model_nazwa]["Mp"]
+    # --- Progi jakości per model ---
+    progi_modele = {
+        "zbiornik_1rz": {"ts": 60.0, "IAE": 50.0, "Mp": 15.0, "ISE": 100.0},
+        "dwa_zbiorniki": {"ts": 80.0, "IAE": 80.0, "Mp": 20.0, "ISE": 150.0},
+        "wahadlo_odwrocone": {"ts": 60.0, "IAE": 20000.0, "Mp": 70000.0, "ISE": 50000.0}
+    }
 
     if tryb == "strojenie":
         for metoda in ["ziegler_nichols", "siatka", "optymalizacja"]:
@@ -67,15 +71,23 @@ def uruchom_symulacje():
             for model_nazwa in modele:
                 print(f"🔍 Testowanie metody {metoda} na modelu {model_nazwa}...")
 
+                # --- Pobranie progów jakości dla danego modelu ---
+                prog_settling = progi_modele[model_nazwa]["ts"]
+                prog_iae = progi_modele[model_nazwa]["IAE"]
+                prog_overshoot = progi_modele[model_nazwa]["Mp"]
+                prog_ise = progi_modele[model_nazwa]["ISE"]
+
+                # --- Import modelu i regulatora ---
                 Model = dynamiczny_import("modele", model_nazwa)
                 Regulator = dynamiczny_import("regulatory", regulator_nazwa)
                 model = Model(dt=dt)
-                import inspect
+
+                # --- Filtrowanie argumentów pod konstruktor regulatora ---
                 sig = inspect.signature(Regulator.__init__)
                 parametry_filtr = {k: v for k, v in parametry.items() if k in sig.parameters}
                 regulator = Regulator(**parametry_filtr, dt=dt)
 
-
+                # --- Symulacja ---
                 kroki = int(czas_sym / dt)
                 t, r, y, u = [], [], [], []
                 for k in range(kroki):
@@ -115,12 +127,12 @@ def uruchom_symulacje():
                     "PASS": pass_gates
                 }
 
-                # Zapis raportu JSON
+                # --- Zapis raportu JSON ---
                 raport_path = os.path.join(out_dir, f"raport_{metoda}_{model_nazwa}.json")
                 with open(raport_path, "w") as f:
                     json.dump(raport, f, indent=2)
 
-                # Wykres
+                # --- Wykres odpowiedzi ---
                 plt.figure()
                 plt.plot(t, r, label="wartość zadana (r)")
                 plt.plot(t, y, label="odpowiedź układu (y)")
@@ -132,7 +144,8 @@ def uruchom_symulacje():
                 plt.close()
 
                 status = "✅" if pass_gates else "❌"
-                print(f"{status} {metoda.upper()} — {model_nazwa}: IAE={wyniki.IAE:.2f}, Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s")
+                print(f"{status} {metoda.upper()} — {model_nazwa}: "
+                      f"IAE={wyniki.IAE:.2f}, Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s")
 
                 if pass_gates:
                     all_pass = True
