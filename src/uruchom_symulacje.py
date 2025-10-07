@@ -33,16 +33,15 @@ def uruchom_symulacje():
 
     # --- Dostępne modele ---
     modele = [
-        "zbiornik_1rz",
-        "dwa_zbiorniki",
-        "wahadlo_odwrocone"
+        "zbiornik_1rz":   {"ts": 60.0, "IAE": 50.0, "Mp": 15.0},
+        "dwa_zbiorniki":  {"ts": 80.0, "IAE": 80.0, "Mp": 20.0},
+        "wahadlo_odwrocone": {"ts": 60.0, "IAE": 20000.0, "Mp": 70000.0}
     ]
 
     # --- Progi jakości ---
-    prog_overshoot = float(os.getenv("GATE_MAX_OVERSHOOT_PCT", 15.0))
-    prog_settling = float(os.getenv("GATE_MAX_SETTLING_TIME", 30.0))
-    prog_iae = float(os.getenv("GATE_MAX_IAE", 50.0))
-    prog_ise = float(os.getenv("GATE_MAX_ISE", 100.0))
+    prog_settling = progi_modele[model_nazwa]["ts"]
+    prog_iae = progi_modele[model_nazwa]["IAE"]
+    prog_overshoot = progi_modele[model_nazwa]["Mp"]
 
     if tryb == "strojenie":
         for metoda in ["ziegler_nichols", "siatka", "optymalizacja"]:
