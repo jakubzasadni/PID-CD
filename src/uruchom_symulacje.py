@@ -32,11 +32,11 @@ def uruchom_symulacje():
     os.makedirs(out_dir, exist_ok=True)
 
     # --- Dostępne modele ---
-    modele = [
-        "zbiornik_1rz":   {"ts": 60.0, "IAE": 50.0, "Mp": 15.0},
-        "dwa_zbiorniki":  {"ts": 80.0, "IAE": 80.0, "Mp": 20.0},
+    progi_modele = {
+        "zbiornik_1rz": {"ts": 60.0, "IAE": 50.0, "Mp": 15.0},
+        "dwa_zbiorniki": {"ts": 80.0, "IAE": 80.0, "Mp": 20.0},
         "wahadlo_odwrocone": {"ts": 60.0, "IAE": 20000.0, "Mp": 70000.0}
-    ]
+    }
 
     # --- Progi jakości ---
     prog_settling = progi_modele[model_nazwa]["ts"]
