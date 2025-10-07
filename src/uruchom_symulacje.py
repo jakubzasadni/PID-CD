@@ -71,7 +71,11 @@ def uruchom_symulacje():
                 Model = dynamiczny_import("modele", model_nazwa)
                 Regulator = dynamiczny_import("regulatory", regulator_nazwa)
                 model = Model(dt=dt)
-                regulator = Regulator(**parametry, dt=dt)
+                import inspect
+                sig = inspect.signature(Regulator.__init__)
+                parametry_filtr = {k: v for k, v in parametry.items() if k in sig.parameters}
+                regulator = Regulator(**parametry_filtr, dt=dt)
+
 
                 kroki = int(czas_sym / dt)
                 t, r, y, u = [], [], [], []
