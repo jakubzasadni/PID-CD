@@ -1,6 +1,7 @@
 # src/uruchom_symulacje.py
 """
 Główny skrypt integrujący strojenie, walidację i raportowanie.
+Obsługuje zmienną środowiskową OUT_DIR (miejsce zapisu raportów).
 """
 
 import os
@@ -8,11 +9,13 @@ import importlib
 import json
 import numpy as np
 import matplotlib.pyplot as plt
-from datetime import datetime
 from src.metryki import oblicz_metryki
 from src.strojenie.wykonaj_strojenie import wykonaj_strojenie
 
 def dynamiczny_import(typ: str, nazwa: str):
+    """
+    Dynamicznie importuje klasę modelu lub regulatora.
+    """
     modul = importlib.import_module(f"src.{typ}.{nazwa}")
     klasa = None
     for attr in dir(modul):
@@ -24,31 +27,36 @@ def dynamiczny_import(typ: str, nazwa: str):
     return klasa
 
 def uruchom_symulacje():
-    # Konfiguracja z environment variables
+    """Główna pętla symulacji."""
     model_nazwa = os.getenv("MODEL", "zbiornik_1rz")
     regulator_nazwa = os.getenv("REGULATOR", "regulator_pid")
     czas_sym = float(os.getenv("CZAS_SYM", 60.0))
     dt = float(os.getenv("DT", 0.05))
     tryb = os.getenv("TRYB", "strojenie")  # "strojenie" lub "walidacja"
+    out_dir = os.getenv("OUT_DIR", "wyniki")
 
-    # Przygotowanie folderu wyników
-    os.makedirs("wyniki", exist_ok=True)
+    os.makedirs(out_dir, exist_ok=True)
 
     if tryb == "strojenie":
         for metoda in ["ziegler_nichols", "siatka", "optymalizacja"]:
             parametry = wykonaj_strojenie(metoda)
-            with open(f"wyniki/parametry_{metoda}.json", "w") as f:
+            with open(os.path.join(out_dir, f"parametry_{metoda}.json"), "w") as f:
                 json.dump(parametry, f, indent=2)
         print("✅ Zakończono strojenie wszystkich metod.")
         return
 
     elif tryb == "walidacja":
-        metody = [f for f in os.listdir("wyniki") if f.startswith("parametry_")]
+        metody = [f for f in os.listdir(out_dir) if f.startswith("parametry_")]
+        if not metody:
+            print("⚠️ Brak plików parametrów w katalogu:", out_dir)
+            return
+
         for plik in metody:
             metoda = plik.split("_")[1].split(".")[0]
-            with open(f"wyniki/{plik}", "r") as f:
+            with open(os.path.join(out_dir, plik), "r") as f:
                 parametry = json.load(f)
 
+            # Dynamiczny import modelu i regulatora
             Model = dynamiczny_import("modele", model_nazwa)
             Regulator = dynamiczny_import("regulatory", regulator_nazwa)
             model = Model(dt=dt)
@@ -66,6 +74,7 @@ def uruchom_symulacje():
                 y.append(y_nowe)
                 u.append(u_k)
 
+            # Obliczenie metryk jakości
             wyniki = oblicz_metryki(t, r, y)
             raport = {
                 "model": model_nazwa,
@@ -74,10 +83,12 @@ def uruchom_symulacje():
                 "metryki": wyniki.__dict__,
             }
 
-            nazwa_pliku = f"wyniki/raport_{metoda}.json"
-            with open(nazwa_pliku, "w") as f:
+            # Zapis raportu
+            raport_path = os.path.join(out_dir, f"raport_{metoda}.json")
+            with open(raport_path, "w") as f:
                 json.dump(raport, f, indent=2)
 
+            # Wykres
             plt.figure()
             plt.plot(t, r, label="wartość zadana (r)")
             plt.plot(t, y, label="odpowiedź układu (y)")
@@ -85,7 +96,7 @@ def uruchom_symulacje():
             plt.xlabel("Czas [s]")
             plt.legend()
             plt.title(f"{metoda.upper()} — {model_nazwa}")
-            plt.savefig(f"wyniki/wykres_{metoda}.png", dpi=120, bbox_inches="tight")
+            plt.savefig(os.path.join(out_dir, f"wykres_{metoda}.png"), dpi=120, bbox_inches="tight")
             plt.close()
 
         print("✅ Zakończono walidację wszystkich metod.")
