@@ -1,73 +1,37 @@
-name: CI Pipeline (Fail Demo)
+name: Strojenie i walidacja regulatorów
 
 on:
-  push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      regulator:
+        description: 'Wybierz regulator do przetestowania'
+        required: true
+        default: 'regulator_pid'
+        type: choice
+        options:
+          - regulator_pid
+          - regulator_pi
+          - regulator_dwupolozeniowy
 
 jobs:
-  build:
+  pipeline:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v3
 
       - name: Build Docker image
+        run: docker build -t regulator-sim:test -f kontener/Dockerfile .
+
+      - name: Run full pipeline
         run: |
-          IMAGE=ghcr.io/${{ github.repository }}/pid-sim:${{ github.sha }}
-          IMAGE=$(echo $IMAGE | tr '[:upper:]' '[:lower:]')
-          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
-          echo "IMAGE=$IMAGE" >> image.env
-          docker build -t $IMAGE .
-          docker push $IMAGE
-
-      - name: Save IMAGE as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: image-env
-          path: image.env
-
-  validate:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
-      - name: Load IMAGE from artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: image-env
-
-      - run: cat image.env >> $GITHUB_ENV
-
-      #Walidacja ze słabymi nastawami PID – pipeline ma failować
-      - name: Run validation (bad PID - should FAIL)
-        run: |
-          mkdir -p out
           docker run --rm \
-            -e OUT_DIR=/out \
-            -e PID_KP=0.2 \
-            -e PID_TI=1.0 \
-            -e GATE_MAX_OVERSHOOT_PCT=15.0 \
-            -e GATE_MAX_TS_MULT_TAU=5.0 \
-            -e GATE_MAX_IAE=50.0 \
-            -v ${{ github.workspace }}/out:/out $IMAGE
+            -e REGULATOR=${{ github.event.inputs.regulator }} \
+            -v ${{ github.workspace }}/wyniki:/app/wyniki \
+            regulator-sim:test python src/uruchom_pipeline.py
 
-      - name: Upload artifacts
-        if: always()
+      - name: Upload reports
         uses: actions/upload-artifact@v4
         with:
-          name: validation-results
-          path: out
+          name: raporty_${{ github.event.inputs.regulator }}
+          path: wyniki/
