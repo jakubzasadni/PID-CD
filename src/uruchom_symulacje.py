@@ -33,9 +33,9 @@ def uruchom_symulacje():
 
     # --- Dostępne modele ---
     modele = [
-        "zbiornik_1rz",    # układ pierwszego rzędu
-        "piec_1rz",        # obiekt cieplny
-        "silnik_dc"        # model silnika prądu stałego
+        "zbiornik_1rz",
+        "dwa_zbiorniki",
+        "wahadlo_odwrocone"
     ]
 
     # --- Progi jakości ---
