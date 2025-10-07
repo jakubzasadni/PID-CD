@@ -5,6 +5,8 @@ dla wybranego regulatora. Regulator wybierany przez zmienną środowiskową REGU
 """
 
 import os
+import sys
+sys.path.append("/app")
 from src.uruchom_symulacje import uruchom_symulacje
 from src.ocena_metod import ocena_metod
 from datetime import datetime
