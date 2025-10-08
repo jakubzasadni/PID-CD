@@ -1,41 +1,38 @@
-# src/metryki.py
-"""
-Zbiór funkcji do obliczania wskaźników jakości regulacji.
-"""
-
 import numpy as np
 from dataclasses import dataclass
 
 @dataclass
-class WynikiMetryk:
+class Metryki:
     IAE: float
     ISE: float
     przeregulowanie: float
     czas_ustalania: float
 
+def oblicz_metryki(t, r, y, settle_band=0.02):
+    r = np.array(r)
+    y = np.array(y)
 
-def oblicz_metryki(t, r, y, pasmo: float = 0.02) -> WynikiMetryk:
-    """
-    Oblicza podstawowe wskaźniki jakości:
-    IAE - całka z wartości bezwzględnej błędu
-    ISE - całka z kwadratu błędu
-    przeregulowanie [%]
-    czas ustalania [s]
-    """
-    e = np.array(r) - np.array(y)
+    e = r - y
     IAE = np.trapz(np.abs(e), t)
-    ISE = np.trapz(e**2, t)
+    ISE = np.trapz(e ** 2, t)
 
-    y_ss = r[-1]
-    przeregulowanie = max(0.0, (max(y) - y_ss) / y_ss * 100)
+    # --- Przeregulowanie [%] ---
+    try:
+        max_y = np.max(y)
+        steady_state = r[-1]
+        przeregulowanie = max(0.0, (max_y - steady_state) / steady_state * 100.0)
+    except Exception:
+        przeregulowanie = 0.0
 
-    # Czas ustalania - moment, gdy sygnał mieści się w ±pasmo przez resztę czasu
-    granica_g = y_ss * (1 + pasmo)
-    granica_d = y_ss * (1 - pasmo)
-    czas_ustalania = t[-1]
-    for i in range(len(y) - 1, 0, -1):
-        if not (granica_d <= y[i] <= granica_g):
-            czas_ustalania = t[i]
-            break
+    # --- Czas ustalania [s] ---
+    try:
+        within_band = np.abs(y - steady_state) <= settle_band * steady_state
+        last_within = np.where(within_band)[0]
+        if len(last_within) > 0:
+            czas_ustalania = t[last_within[-1]]
+        else:
+            czas_ustalania = t[-1]
+    except Exception:
+        czas_ustalania = t[-1]
 
-    return WynikiMetryk(IAE, ISE, przeregulowanie, czas_ustalania)
+    return Metryki(IAE, ISE, przeregulowanie, czas_ustalania)
