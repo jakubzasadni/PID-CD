@@ -14,17 +14,14 @@ on:
           - regulator_dwupolozeniowy
 
 jobs:
-  build:
+  tune:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Build Docker image
         run: docker build -t regulator-sim:test -f kontener/Dockerfile .
 
-  tune:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
       - name: Strojenie regulatorów
         run: |
           docker run --rm \
@@ -38,6 +35,11 @@ jobs:
     needs: tune
     continue-on-error: true
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t regulator-sim:test -f kontener/Dockerfile .
+
       - name: Walidacja modelu zbiornik_1rz
         id: zbiornik
         run: |
@@ -56,6 +58,11 @@ jobs:
     needs: tune
     continue-on-error: true
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t regulator-sim:test -f kontener/Dockerfile .
+
       - name: Walidacja modelu dwa_zbiorniki
         id: dwa
         run: |
@@ -74,6 +81,11 @@ jobs:
     needs: tune
     continue-on-error: true
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t regulator-sim:test -f kontener/Dockerfile .
+
       - name: Walidacja modelu wahadlo_odwrocone
         id: wahadlo
         run: |
@@ -91,6 +103,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [validate_zbiornik, validate_dwa_zbiorniki, validate_wahadlo]
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t regulator-sim:test -f kontener/Dockerfile .
+
       - name: Generuj raport zbiorczy
         run: |
           docker run --rm \
