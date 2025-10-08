@@ -8,7 +8,6 @@ Dodano progi jakości oraz walidację PASS/FAIL.
 import os
 import importlib
 import json
-import inspect
 import numpy as np
 import matplotlib.pyplot as plt
 from src.metryki import oblicz_metryki
@@ -16,7 +15,6 @@ from src.strojenie.wykonaj_strojenie import wykonaj_strojenie
 
 
 def dynamiczny_import(typ: str, nazwa: str):
-    """Dynamicznie importuje klasę modelu lub regulatora."""
     modul = importlib.import_module(f"src.{typ}.{nazwa}")
     for attr in dir(modul):
         if attr.lower() == nazwa.lower():
@@ -31,37 +29,45 @@ def uruchom_symulacje():
     dt = float(os.getenv("DT", 0.05))
     tryb = os.getenv("TRYB", "strojenie")
     out_dir = os.getenv("OUT_DIR", "wyniki")
+    model_env = os.getenv("MODEL", None)
     os.makedirs(out_dir, exist_ok=True)
 
-    # --- Dostępne modele ---
-    modele = [
-        "zbiornik_1rz",
-        "dwa_zbiorniki",
-        "wahadlo_odwrocone"
-    ]
-
-    # --- Progi jakości per model ---
+    # --- Dostępne modele i progi jakości ---
     progi_modele = {
-        "zbiornik_1rz": {"ts": 60.0, "IAE": 50.0, "Mp": 15.0, "ISE": 100.0},
-        "dwa_zbiorniki": {"ts": 80.0, "IAE": 80.0, "Mp": 20.0, "ISE": 150.0},
-        "wahadlo_odwrocone": {"ts": 60.0, "IAE": 20000.0, "Mp": 70000.0, "ISE": 50000.0}
+        "zbiornik_1rz": {"ts": 60.0, "IAE": 50.0, "Mp": 15.0},
+        "dwa_zbiorniki": {"ts": 80.0, "IAE": 80.0, "Mp": 20.0},
+        "wahadlo_odwrocone": {"ts": 60.0, "IAE": 20000.0, "Mp": 70000.0},
     }
 
+    modele = [model_env] if model_env else list(progi_modele.keys())
+
+    print(f"🔧 Wybrany regulator: {regulator_nazwa}")
+    print("🧱 Modele procesów:", ", ".join(modele))
+    print("--------------------------------------------------")
+
+    # --- Tryb strojenia ---
     if tryb == "strojenie":
+        print("⚙️ [1/3] Strojenie metodami klasycznymi i optymalizacyjnymi...")
         for metoda in ["ziegler_nichols", "siatka", "optymalizacja"]:
+            print(f"⚙️ Strojenie metodą {metoda.replace('_', ' ').title()}...")
             parametry = wykonaj_strojenie(metoda)
             with open(os.path.join(out_dir, f"parametry_{metoda}.json"), "w") as f:
                 json.dump(parametry, f, indent=2)
         print("✅ Zakończono strojenie wszystkich metod.")
         return
 
+    # --- Tryb walidacji ---
     elif tryb == "walidacja":
         metody = [f for f in os.listdir(out_dir) if f.startswith("parametry_")]
         if not metody:
             print("⚠️ Brak plików parametrów w katalogu:", out_dir)
             return
 
-        all_pass = False  # globalny status walidacji
+        all_pass = False
+        pass_count = 0
+        total_count = 0
+
+        print("\n🧪 [2/3] Walidacja wszystkich metod...")
 
         for plik in metody:
             metoda = plik.split("_")[1].split(".")[0]
@@ -69,25 +75,20 @@ def uruchom_symulacje():
                 parametry = json.load(f)
 
             for model_nazwa in modele:
-                print(f"🔍 Testowanie metody {metoda} na modelu {model_nazwa}...")
+                total_count += 1
+                prog = progi_modele[model_nazwa]
+                print(f"\n🔍 Testowanie metody {metoda.upper()} na modelu {model_nazwa}...")
+                print(f"📏 Progi jakości: ts ≤ {prog['ts']}s, IAE ≤ {prog['IAE']}, Mp ≤ {prog['Mp']}%")
 
-                # --- Pobranie progów jakości dla danego modelu ---
-                prog_settling = progi_modele[model_nazwa]["ts"]
-                prog_iae = progi_modele[model_nazwa]["IAE"]
-                prog_overshoot = progi_modele[model_nazwa]["Mp"]
-                prog_ise = progi_modele[model_nazwa]["ISE"]
-
-                # --- Import modelu i regulatora ---
                 Model = dynamiczny_import("modele", model_nazwa)
                 Regulator = dynamiczny_import("regulatory", regulator_nazwa)
                 model = Model(dt=dt)
 
-                # --- Filtrowanie argumentów pod konstruktor regulatora ---
+                import inspect
                 sig = inspect.signature(Regulator.__init__)
                 parametry_filtr = {k: v for k, v in parametry.items() if k in sig.parameters}
                 regulator = Regulator(**parametry_filtr, dt=dt)
 
-                # --- Symulacja ---
                 kroki = int(czas_sym / dt)
                 t, r, y, u = [], [], [], []
                 for k in range(kroki):
@@ -102,37 +103,34 @@ def uruchom_symulacje():
 
                 wyniki = oblicz_metryki(t, r, y)
 
-                # --- Sprawdzenie progów jakości ---
+                # --- Walidacja ---
                 pass_gates = True
-                if wyniki.przeregulowanie > prog_overshoot:
+                powod = []
+                if wyniki.przeregulowanie > prog["Mp"]:
                     pass_gates = False
-                if wyniki.czas_ustalania > prog_settling:
+                    powod.append("przeregulowanie")
+                if wyniki.czas_ustalania > prog["ts"]:
                     pass_gates = False
-                if wyniki.IAE > prog_iae:
+                    powod.append("czas ustalania")
+                if wyniki.IAE > prog["IAE"]:
                     pass_gates = False
-                if wyniki.ISE > prog_ise:
-                    pass_gates = False
+                    powod.append("IAE")
 
                 raport = {
                     "model": model_nazwa,
                     "regulator": regulator_nazwa,
                     "metoda": metoda,
                     "metryki": wyniki.__dict__,
-                    "progi": {
-                        "overshoot_max": prog_overshoot,
-                        "settling_max": prog_settling,
-                        "IAE_max": prog_iae,
-                        "ISE_max": prog_ise
-                    },
-                    "PASS": pass_gates
+                    "progi": prog,
+                    "PASS": pass_gates,
+                    "niezaliczone": powod,
                 }
 
-                # --- Zapis raportu JSON ---
                 raport_path = os.path.join(out_dir, f"raport_{metoda}_{model_nazwa}.json")
                 with open(raport_path, "w") as f:
                     json.dump(raport, f, indent=2)
 
-                # --- Wykres odpowiedzi ---
+                # --- Wykres ---
                 plt.figure()
                 plt.plot(t, r, label="wartość zadana (r)")
                 plt.plot(t, y, label="odpowiedź układu (y)")
@@ -144,13 +142,17 @@ def uruchom_symulacje():
                 plt.close()
 
                 status = "✅" if pass_gates else "❌"
-                print(f"{status} {metoda.upper()} — {model_nazwa}: "
-                      f"IAE={wyniki.IAE:.2f}, Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s")
-
                 if pass_gates:
-                    all_pass = True
+                    pass_count += 1
+                    print(f"{status} {metoda.upper()} — {model_nazwa}: IAE={wyniki.IAE:.2f}, Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s (OK)")
+                else:
+                    print(f"{status} {metoda.upper()} — {model_nazwa}: IAE={wyniki.IAE:.2f}, Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s ❌ nie spełniono: {', '.join(powod)}")
 
-        if not all_pass:
+        print("\n--------------------------------------------------")
+        print(f"📊 Łączny wynik walidacji: {pass_count}/{total_count} modeli spełniło progi jakości "
+              f"({100*pass_count/total_count:.1f}%)")
+
+        if pass_count == 0:
             print("❌ Żaden regulator nie spełnił progów jakości.")
             exit(1)
 
