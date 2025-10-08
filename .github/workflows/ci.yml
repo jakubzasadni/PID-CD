@@ -227,9 +227,9 @@ jobs:
         if: ${{ steps.read_models.outputs.models != '' }}
         env:
           GITOPS_REPO: "https://github.com/JakubZasadni/cl-gitops-regulatory.git"
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
         run: |
-          git clone $GITOPS_REPO gitops
+          git clone https://${GH_TOKEN}@${GITOPS_REPO#https://} gitops
           cd gitops
           for MODEL in ${{ steps.read_models.outputs.models }}; do
             echo "🔧 Aktualizuję manifest dla modelu: $MODEL"
