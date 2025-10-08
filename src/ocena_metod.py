@@ -1,7 +1,8 @@
 # src/ocena_metod.py
 """
 Analiza i porównanie wyników walidacji regulatorów.
-Tworzy raport HTML z kolorowym oznaczeniem PASS/FAIL i procentem zaliczonych modeli.
+Tworzy raport HTML z kolorowym oznaczeniem PASS/FAIL,
+procentem zaliczonych modeli oraz listę modeli do wdrożenia.
 """
 
 import os
@@ -11,7 +12,7 @@ from statistics import mean
 
 def ocena_metod(wyniki_dir: str):
     """
-    Przetwarza raporty z walidacji i generuje zbiorczy raport HTML.
+    Przetwarza raporty z walidacji i generuje zbiorczy raport HTML + listę modeli do wdrożenia.
     """
     wyniki_path = Path(wyniki_dir)
     raporty = sorted([f for f in wyniki_path.glob("raport_*.json")])
@@ -48,6 +49,19 @@ def ocena_metod(wyniki_dir: str):
 
     # Wybór najlepszego regulatora
     najlepsza_metoda = min(statystyki.keys(), key=lambda m: statystyki[m]["avg_IAE"])
+
+    # --- Tworzenie listy modeli do wdrożenia ---
+    passed_models = sorted(set([r["model"] for r in dane if r["PASS"]]))
+    passed_models_path = wyniki_path / "passed_models.txt"
+
+    if passed_models:
+        with open(passed_models_path, "w") as f:
+            for model in passed_models:
+                f.write(model + "\n")
+        print(f"✅ Utworzono listę modeli do wdrożenia: {passed_models_path}")
+        print("Modele:", ", ".join(passed_models))
+    else:
+        print("❌ Żaden model nie spełnił progów jakości — plik passed_models.txt nie zostanie utworzony.")
 
     # --- Generacja raportu HTML ---
     html = []
@@ -110,7 +124,5 @@ def ocena_metod(wyniki_dir: str):
     print(f"✅ Najlepszy regulator: {najlepsza_metoda.upper()} "
           f"(średni IAE={statystyki[najlepsza_metoda]['avg_IAE']:.2f})")
 
-
 if __name__ == "__main__":
-    # testowe uruchomienie lokalne
     ocena_metod("wyniki")
