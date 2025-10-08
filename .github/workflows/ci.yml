@@ -197,16 +197,20 @@ jobs:
       - name: Read passed models
         id: read_models
         run: |
+          echo "📄 Odczytuję listę modeli..."
           if [ ! -f wyniki/passed_models.txt ]; then
-            echo "⚠️ Brak modeli do wdrożenia."
-            echo "models=" >> $GITHUB_OUTPUT
+            echo "⚠️ Brak pliku wyniki/passed_models.txt"
+            echo "has_models=false" >> $GITHUB_OUTPUT
           else
             echo "✅ Modele do wdrożenia:"
             cat wyniki/passed_models.txt
-            echo "models=$(cat wyniki/passed_models.txt | tr '\n' ' ')" >> $GITHUB_OUTPUT
+            MODELS=$(cat wyniki/passed_models.txt | tr '\n' ' ' | xargs)
+            echo "models=$MODELS" >> $GITHUB_OUTPUT
+            echo "has_models=true" >> $GITHUB_OUTPUT
           fi
 
       - name: Log in to GitHub Container Registry
+        if: steps.read_models.outputs.has_models == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -214,7 +218,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push images for passed models
-        if: ${{ steps.read_models.outputs.models != '' }}
+        if: steps.read_models.outputs.has_models == 'true'
         run: |
           for MODEL in ${{ steps.read_models.outputs.models }}; do
             IMAGE="ghcr.io/${{ github.repository_owner }}/${MODEL}-regulator:latest"
@@ -224,18 +228,30 @@ jobs:
           done
 
       - name: Update GitOps repository
-        if: ${{ steps.read_models.outputs.models != '' }}
+        if: steps.read_models.outputs.has_models == 'true'
         env:
           GITOPS_REPO: "https://github.com/JakubZasadni/cl-gitops-regulatory.git"
           GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
         run: |
-          git clone https://${GH_TOKEN}@${GITOPS_REPO#https://} gitops
+          set -e
+          echo "🧩 Klonuję repozytorium GitOps..."
+          git clone https://${GH_TOKEN}@github.com/JakubZasadni/cl-gitops-regulatory.git gitops
           cd gitops
+
           for MODEL in ${{ steps.read_models.outputs.models }}; do
             echo "🔧 Aktualizuję manifest dla modelu: $MODEL"
-            yq -i ".spec.template.spec.containers[0].image = \"ghcr.io/${{ github.repository_owner }}/${MODEL}-regulator:latest\"" kustomize/apps/${MODEL}/base/deployment.yml
+            yq -i ".spec.template.spec.containers[0].image = \"ghcr.io/${{ github.repository_owner }}/${MODEL}-regulator:latest\"" kustomize/apps/${MODEL}/base/deployment.yml || echo "⚠️ Brak pliku deployment.yml dla $MODEL"
           done
+
           git config user.email "ci@github"
           git config user.name "GitHub Actions"
-          git commit -am "auto-deploy: updated images for passed models"
-          git push
+
+          echo "🔍 Sprawdzam, czy są zmiany..."
+          if git diff --quiet; then
+            echo "✅ Brak zmian do zapisania — pomijam commit."
+          else
+            echo "💾 Commituję zmiany..."
+            git add .
+            git commit -m "auto-deploy: updated images for passed models"
+            git push origin main || (echo '⚠️ Git push failed, sprawdź uprawnienia GH_TOKEN' && exit 1)
+          fi
