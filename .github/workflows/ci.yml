@@ -222,7 +222,8 @@ jobs:
         run: |
           for MODEL in ${{ steps.read_models.outputs.models }}; do
             SAFE_MODEL=$(echo "$MODEL" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
-            IMAGE="ghcr.io/${{ github.repository_owner }}/${SAFE_MODEL}-regulator:latest"
+            OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+            IMAGE="ghcr.io/${OWNER}/${SAFE_MODEL}-regulator:latest"
             echo "🚀 Buduję i wysyłam obraz: $IMAGE"
             docker build -t "$IMAGE" -f kontener/Dockerfile .
             docker push "$IMAGE"
