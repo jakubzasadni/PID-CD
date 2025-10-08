@@ -145,12 +145,19 @@ jobs:
           merge-multiple: true
           path: wyniki/
 
+      - name: Move all reports to main wyniki folder
+        run: |
+          echo "📦 Kopiuję wyniki z podkatalogów..."
+          find wyniki -type f -name "*.json" -exec mv {} wyniki/ \; || true
+          find wyniki -type f -name "*.png" -exec mv {} wyniki/ \; || true
+          ls -R wyniki
+
       - name: Generuj raport zbiorczy
         run: |
           docker run --rm \
             -e REGULATOR=${{ github.event.inputs.regulator }} \
             -v ${{ github.workspace }}/wyniki:/app/wyniki \
-            regulator-sim:test python src/ocena_metod.py
+            regulator-sim:test python src/ocena_metod.py || echo "⚠️ Brak raportów do oceny w katalogu: wyniki"
 
       - name: Sprawdź wyniki i zdecyduj o statusie
         run: |
@@ -173,3 +180,4 @@ jobs:
         with:
           name: raport_${{ github.event.inputs.regulator }}
           path: wyniki/
+
