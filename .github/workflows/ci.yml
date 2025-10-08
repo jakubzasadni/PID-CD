@@ -221,11 +221,13 @@ jobs:
         if: steps.read_models.outputs.has_models == 'true'
         run: |
           for MODEL in ${{ steps.read_models.outputs.models }}; do
-            IMAGE="ghcr.io/${{ github.repository_owner }}/${MODEL}-regulator:latest"
+            SAFE_MODEL=$(echo "$MODEL" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+            IMAGE="ghcr.io/${{ github.repository_owner }}/${SAFE_MODEL}-regulator:latest"
             echo "🚀 Buduję i wysyłam obraz: $IMAGE"
-            docker build -t $IMAGE -f kontener/Dockerfile .
-            docker push $IMAGE
+            docker build -t "$IMAGE" -f kontener/Dockerfile .
+            docker push "$IMAGE"
           done
+
 
       - name: Update GitOps repository
         if: steps.read_models.outputs.has_models == 'true'
