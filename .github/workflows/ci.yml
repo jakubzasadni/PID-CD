@@ -147,7 +147,7 @@ jobs:
 
       - name: Move all reports to main wyniki folder
         run: |
-          echo "📦 Kopiuję wyniki z podkatalogów..."
+          echo "Kopiuję wyniki z podkatalogów..."
           find wyniki -type f -name "*.json" -exec mv {} wyniki/ \; || true
           find wyniki -type f -name "*.png" -exec mv {} wyniki/ \; || true
           ls -R wyniki
@@ -157,13 +157,13 @@ jobs:
           docker run --rm \
             -e REGULATOR=${{ github.event.inputs.regulator }} \
             -v ${{ github.workspace }}/wyniki:/app/wyniki \
-            regulator-sim:test python src/ocena_metod.py || echo "⚠️ Brak raportów do oceny w katalogu: wyniki"
+            regulator-sim:test python src/ocena_metod.py || echo "Brak raportów do oceny w katalogu: wyniki"
 
       - name: Sprawdź wyniki i zdecyduj o statusie
         run: |
           cd wyniki
           if [ ! -f raport.html ]; then
-            echo "⚠️ Brak raportu HTML — prawdopodobnie brak wyników walidacji"
+            echo "Brak raportu HTML — prawdopodobnie brak wyników walidacji"
             exit 1
           fi
 
@@ -197,12 +197,12 @@ jobs:
       - name: Read passed models
         id: read_models
         run: |
-          echo "📄 Odczytuję listę modeli..."
+          echo "Odczytuję listę modeli..."
           if [ ! -f wyniki/passed_models.txt ]; then
-            echo "⚠️ Brak pliku wyniki/passed_models.txt"
+            echo "Brak pliku wyniki/passed_models.txt"
             echo "has_models=false" >> $GITHUB_OUTPUT
           else
-            echo "✅ Modele do wdrożenia:"
+            echo "Modele do wdrożenia:"
             cat wyniki/passed_models.txt
             MODELS=$(cat wyniki/passed_models.txt | tr '\n' ' ' | xargs)
             echo "models=$MODELS" >> $GITHUB_OUTPUT
@@ -237,7 +237,7 @@ jobs:
           GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
         run: |
           set -e
-          echo "🧩 Klonuję repozytorium GitOps..."
+          echo "Klonuję repozytorium GitOps..."
           git clone https://${GH_TOKEN}@github.com/JakubZasadni/cl-gitops-regulatory.git gitops
           cd gitops
 
@@ -251,10 +251,10 @@ jobs:
 
           echo "🔍 Sprawdzam, czy są zmiany..."
           if git diff --quiet; then
-            echo "✅ Brak zmian do zapisania — pomijam commit."
+            echo "Brak zmian do zapisania — pomijam commit."
           else
-            echo "💾 Commituję zmiany..."
+            echo "Commituję zmiany..."
             git add .
             git commit -m "auto-deploy: updated images for passed models"
-            git push origin main || (echo '⚠️ Git push failed, sprawdź uprawnienia GH_TOKEN' && exit 1)
+            git push origin main || (echo 'Git push failed, sprawdź uprawnienia GH_TOKEN' && exit 1)
           fi
