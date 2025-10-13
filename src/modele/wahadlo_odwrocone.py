@@ -14,7 +14,7 @@ class Wahadlo_odwrocone(ModelBazowy):
         self.y = self.theta
 
     def step(self, u):
-        d2theta = (self.g / self.l) * self.theta - u / (self.m * self.l ** 2) - self.d * self.omega
+        d2theta = -(self.g / self.l) * self.theta + u / (self.m * self.l ** 2) - self.d * self.omega
         self.omega += d2theta * self.dt
         self.theta += self.omega * self.dt
         # opcjonalny clamp liniowy:
