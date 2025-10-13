@@ -15,28 +15,29 @@ from src.strojenie.wykonaj_strojenie import wykonaj_strojenie
 
 
 def dynamiczny_import(typ: str, nazwa: str):
+    """Dynamicznie importuje klasę modelu lub regulatora po nazwie."""
     modul = importlib.import_module(f"src.{typ}.{nazwa}")
     for attr in dir(modul):
         if attr.lower() == nazwa.lower():
             return getattr(modul, attr)
+    # fallback – zwraca pierwszą klasę nieukrytą
     return getattr(modul, [a for a in dir(modul) if not a.startswith("_")][0])
 
 
 def uruchom_symulacje():
-    """Główna funkcja symulacji."""
+    """Główna funkcja symulacji i walidacji."""
     regulator_nazwa = os.getenv("REGULATOR", "regulator_pid")
     czas_sym = float(os.getenv("CZAS_SYM", 60.0))
-    dt = float(os.getenv("DT", 0.05))
     tryb = os.getenv("TRYB", "strojenie")
     out_dir = os.getenv("OUT_DIR", "wyniki")
     model_env = os.getenv("MODEL", None)
     os.makedirs(out_dir, exist_ok=True)
 
-    # --- Dostępne modele i progi jakości ---
+    # --- Progi jakości dla modeli ---
     progi_modele = {
         "zbiornik_1rz": {"ts": 60.0, "IAE": 50.0, "Mp": 15.0},
         "dwa_zbiorniki": {"ts": 80.0, "IAE": 80.0, "Mp": 20.0},
-        "wahadlo_odwrocone": {"ts": 60.0, "IAE": 20000.0, "Mp": 70000.0},
+        "wahadlo_odwrocone": {"ts": 10.0, "IAE": 10.0, "Mp": 50.0},  # zaostrzone
     }
 
     modele = [model_env] if model_env else list(progi_modele.keys())
@@ -63,10 +64,8 @@ def uruchom_symulacje():
             print("⚠️ Brak plików parametrów w katalogu:", out_dir)
             return
 
-        all_pass = False
         pass_count = 0
         total_count = 0
-
         print("\n🧪 [2/3] Walidacja wszystkich metod...")
 
         for plik in metody:
@@ -82,7 +81,8 @@ def uruchom_symulacje():
 
                 Model = dynamiczny_import("modele", model_nazwa)
                 Regulator = dynamiczny_import("regulatory", regulator_nazwa)
-                model = Model(dt=dt)
+                model = Model()
+                dt = model.dt  # użyj dt modelu
 
                 import inspect
                 sig = inspect.signature(Regulator.__init__)
@@ -91,9 +91,11 @@ def uruchom_symulacje():
 
                 kroki = int(czas_sym / dt)
                 t, r, y, u = [], [], [], []
+
                 for k in range(kroki):
                     t.append(k * dt)
-                    r_zad = 1.0
+                    # cel dla wahadła = 0, reszta = 1
+                    r_zad = 0.0 if model_nazwa == "wahadlo_odwrocone" else 1.0
                     y_k = model.y
                     u_k = regulator.update(r_zad, y_k)
                     y_nowe = model.step(u_k)
@@ -103,9 +105,13 @@ def uruchom_symulacje():
 
                 wyniki = oblicz_metryki(t, r, y)
 
-                # --- Walidacja ---
+                # --- Walidacja progów ---
                 pass_gates = True
                 powod = []
+
+                if np.std(u) < 1e-4:
+                    pass_gates = False
+                    powod.append("brak reakcji regulatora (u ~ const)")
                 if wyniki.przeregulowanie > prog["Mp"]:
                     pass_gates = False
                     powod.append("przeregulowanie")
@@ -144,9 +150,13 @@ def uruchom_symulacje():
                 status = "✅" if pass_gates else "❌"
                 if pass_gates:
                     pass_count += 1
-                    print(f"{status} {metoda.upper()} — {model_nazwa}: IAE={wyniki.IAE:.2f}, Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s (OK)")
+                    print(f"{status} {metoda.upper()} — {model_nazwa}: "
+                          f"IAE={wyniki.IAE:.2f}, Mp={wyniki.przeregulowanie:.1f}%, "
+                          f"ts={wyniki.czas_ustalania:.1f}s (OK)")
                 else:
-                    print(f"{status} {metoda.upper()} — {model_nazwa}: IAE={wyniki.IAE:.2f}, Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s ❌ nie spełniono: {', '.join(powod)}")
+                    print(f"{status} {metoda.upper()} — {model_nazwa}: "
+                          f"IAE={wyniki.IAE:.2f}, Mp={wyniki.przeregulowanie:.1f}%, "
+                          f"ts={wyniki.czas_ustalania:.1f}s ❌ nie spełniono: {', '.join(powod)}")
 
         print("\n--------------------------------------------------")
         print(f"📊 Łączny wynik walidacji: {pass_count}/{total_count} modeli spełniło progi jakości "
