@@ -5,7 +5,7 @@ class Dwa_zbiorniki(ModelBazowy):
     """
     Model dwóch zbiorników w kaskadzie.
     """
-    def __init__(self, K=1.0, tau1=20.0, tau2=10.0, dt=0.05):
+    def __init__(self, K=1.0, tau1=8.0, tau2=4.0, dt=0.05):
         super().__init__(dt)
         self.K = K
         self.tau1 = tau1
