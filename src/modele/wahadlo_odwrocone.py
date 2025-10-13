@@ -21,7 +21,8 @@ class Wahadlo_odwrocone(ModelBazowy):
 
     def step(self, u):
         # Równanie ruchu wahadła odwróconego (liniowe)
-        d2theta = (self.g / self.l) * self.theta - u / (self.m * self.l ** 2) - self.d * self.omega
+        d2theta = -(self.g / self.l) * self.theta + u / (self.m * self.l ** 2) - self.d * self.omega
+
         # Integracja numeryczna (Euler)
         self.omega += d2theta * self.dt
         self.theta += self.omega * self.dt
