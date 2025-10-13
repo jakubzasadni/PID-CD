@@ -114,6 +114,7 @@ jobs:
         run: |
           docker run --rm \
             -e REGULATOR=${{ github.event.inputs.regulator }} \
+            -e DT=0.005 \
             -e TRYB=walidacja \
             -e MODEL=wahadlo_odwrocone \
             -v ${{ github.workspace }}/wyniki:/app/wyniki \
