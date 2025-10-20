@@ -1,4 +1,3 @@
-# src/ocena_metod.py
 """
 Analiza i porównanie wyników walidacji regulatorów.
 Tworzy raport HTML z kolorowym oznaczeniem PASS/FAIL,
@@ -49,6 +48,8 @@ def ocena_metod(wyniki_dir: str):
 
     # Wybór najlepszego regulatora
     najlepsza_metoda = min(statystyki.keys(), key=lambda m: statystyki[m]["avg_IAE"])
+    najlepsze = [r for r in dane if r["metoda"] == najlepsza_metoda and r["PASS"]]
+    najlepsze_parametry = najlepsze[0].get("parametry", {}) if najlepsze else {}
 
     # --- Tworzenie listy modeli do wdrożenia ---
     passed_models = sorted(set([r["model"] for r in dane if r["PASS"]]))
@@ -81,6 +82,9 @@ def ocena_metod(wyniki_dir: str):
     html.append("</style>")
     html.append("</head><body>")
     html.append("<h1>Raport walidacji regulatorów</h1>")
+
+    # --- Tabela metryk ---
+    html.append("<h2>📘 Tabela 1. Wyniki walidacji</h2>")
     html.append("<table>")
     html.append("<tr><th>Metoda</th><th>Model</th><th>IAE</th><th>ISE</th><th>Mp [%]</th><th>ts [s]</th><th>Status</th></tr>")
 
@@ -96,6 +100,18 @@ def ocena_metod(wyniki_dir: str):
 
     html.append("</table>")
 
+    # --- NOWA TABELA: Parametry PID ---
+    html.append("<h2>⚙️ Tabela 2. Parametry regulatorów PID</h2>")
+    html.append("<table>")
+    html.append("<tr><th>Metoda</th><th>Model</th><th>Kp</th><th>Ti</th><th>Td</th></tr>")
+    for r in dane:
+        p = r.get("parametry", {})
+        html.append(
+            f"<tr><td>{r['metoda']}</td><td>{r['model']}</td>"
+            f"<td>{p.get('kp', '-')}</td><td>{p.get('ti', '-')}</td><td>{p.get('td', '-')}</td></tr>"
+        )
+    html.append("</table>")
+
     # --- Podsumowanie ---
     html.append("<div class='summary'>")
     html.append("<h2>Podsumowanie metod</h2>")
@@ -104,9 +120,18 @@ def ocena_metod(wyniki_dir: str):
     for m, s in statystyki.items():
         html.append(f"<tr><td>{m}</td><td>{s['pass_percent']:.1f}%</td><td>{s['avg_IAE']:.2f}</td></tr>")
     html.append("</table>")
-    html.append(f"<p><b>Najlepszy regulator:</b> <span style='color:green'>{najlepsza_metoda.upper()}</span></p>")
-    html.append("</div>")
 
+    html.append(f"<p><b>Najlepszy regulator:</b> <span style='color:green'>{najlepsza_metoda.upper()}</span></p>")
+
+    # --- Nowa sekcja: parametry najlepszego regulatora ---
+    if najlepsze_parametry:
+        html.append("<h3>Parametry najlepszego regulatora:</h3>")
+        html.append("<ul>")
+        for k, v in najlepsze_parametry.items():
+            html.append(f"<li><b>{k}</b>: {v}</li>")
+        html.append("</ul>")
+
+    html.append("</div>")
     html.append("</body></html>")
 
     raport_html = wyniki_path / "raport.html"
@@ -115,6 +140,7 @@ def ocena_metod(wyniki_dir: str):
     # --- zapis JSON z wyborem najlepszego regulatora ---
     najlepszy_json = {
         "najlepszy_regulator": najlepsza_metoda,
+        "parametry": najlepsze_parametry,
         "statystyki": statystyki
     }
     with open(wyniki_path / "najlepszy_regulator.json", "w") as f:
