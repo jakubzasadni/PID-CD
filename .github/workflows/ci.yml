@@ -36,7 +36,7 @@ jobs:
       - name: Upload tuning results
         uses: actions/upload-artifact@v4
         with:
-          name: tuning-results
+          name: wyniki-tune
           path: |
             wyniki/parametry_*.json
             wyniki/raport_strojenie_*.html
