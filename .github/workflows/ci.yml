@@ -34,10 +34,13 @@ jobs:
             regulator-sim:test python src/uruchom_symulacje.py
 
       - name: Upload tuning results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
-          name: wyniki-tune
-          path: wyniki/
+          name: tuning-results
+          path: |
+            wyniki/parametry_*.json
+            wyniki/raport_strojenie_*.html
+            wyniki/strojenie_*.png
 
   # -----------------------------------------------------
   # 2️⃣ Walidacja modeli (każdy w osobnym kroku)
