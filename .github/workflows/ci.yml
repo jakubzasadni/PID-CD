@@ -34,7 +34,7 @@ jobs:
             regulator-sim:test python src/uruchom_symulacje.py
 
       - name: Upload tuning results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tuning-results
           path: |
