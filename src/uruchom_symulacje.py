@@ -1,4 +1,3 @@
-# src/uruchom_symulacje.py
 """
 Symulacja i walidacja dla wielu modeli procesów.
 Każda metoda strojenia testowana na wszystkich modelach.
@@ -48,13 +47,12 @@ def uruchom_symulacje():
 
     # --- Tryb strojenia ---
     if tryb == "strojenie":
-        print("⚙️ [1/3] Strojenie metodami klasycznymi i optymalizacyjnymi...")
-        for metoda in ["ziegler_nichols", "siatka", "optymalizacja"]:
-            print(f"⚙️ Strojenie metodą {metoda.replace('_', ' ').title()}...")
-            parametry = wykonaj_strojenie(metoda)
-            with open(os.path.join(out_dir, f"parametry_{metoda}.json"), "w") as f:
-                json.dump(parametry, f, indent=2)
-        print("✅ Zakończono strojenie wszystkich metod.")
+        print("⚙️ [1/3] Strojenie regulatorów")
+        print("\nDostępne metody strojenia:")
+        print("  • Ziegler–Nichols — klasyczna metoda oscylacyjna, prosta i szybka")
+        print("  • Przeszukiwanie siatki (Grid Search) — metoda iteracyjna dla różnych kombinacji Kp, Ti, Td")
+        print("  • Optymalizacja numeryczna — algorytm minimalizacji funkcji celu (SciPy optimize)")
+        print("\nKażda z tych metod zostanie automatycznie zastosowana w kroku walidacji.")
         return
 
     # --- Tryb walidacji ---
@@ -126,6 +124,7 @@ def uruchom_symulacje():
                     "model": model_nazwa,
                     "regulator": regulator_nazwa,
                     "metoda": metoda,
+                    "parametry": parametry,
                     "metryki": wyniki.__dict__,
                     "progi": prog,
                     "PASS": pass_gates,
