@@ -1,4 +1,3 @@
-# src/strojenie/wykonaj_strojenie.py
 """
 Moduł wywołujący różne metody strojenia regulatorów.
 Zwraca zestaw parametrów do testów walidacyjnych i generuje raport HTML.
@@ -55,25 +54,29 @@ def zapisz_raport_html(parametry, metoda, historia=None, out_dir="wyniki"):
 
         f.write("</body></html>")
 
-    print(f"Zapisano raport HTML: {html_path}")
+    print(f"✅ Zapisano raport HTML: {html_path}")
     return html_path
 
 
 def wykonaj_strojenie(metoda="ziegler_nichols"):
     """
     Uruchamia proces strojenia zgodnie z wybraną metodą.
-    Zwraca słownik parametrów regulatora.
+    Zwraca słownik parametrów regulatora w formacie {'Kp', 'Ti', 'Td'}.
     """
     out_dir = "wyniki"
     historia = None
 
+    # --- Wybór metody strojenia ---
     if metoda == "ziegler_nichols":
         print("⚙️ Strojenie metodą Zieglera-Nicholsa...")
         parametry = strojenie_PID(Ku=2.0, Tu=25.0)
 
     elif metoda == "siatka":
         print("⚙️ Strojenie metodą przeszukiwania siatki...")
-        def funkcja_celu(kp, ti): return (kp - 2)**2 + (ti - 30)**2
+
+        def funkcja_celu(kp, ti):
+            return (kp - 2) ** 2 + (ti - 30) ** 2
+
         parametry = przeszukiwanie_siatki(
             np.linspace(0.5, 5, 10),
             np.linspace(5, 60, 10),
@@ -83,8 +86,9 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
     elif metoda == "optymalizacja":
         print("⚙️ Strojenie metodą optymalizacji numerycznej...")
         historia = []
+
         def funkcja_celu(x):
-            wartosc = (x[0] - 2)**2 + (x[1] - 30)**2
+            wartosc = (x[0] - 2) ** 2 + (x[1] - 30) ** 2
             historia.append(wartosc)
             return wartosc
 
@@ -97,44 +101,40 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
     else:
         raise ValueError(f"❌ Nieznana metoda strojenia: {metoda}")
 
-    # Zapisz wyniki do JSON
-    os.makedirs(out_dir, exist_ok=True)
-    json_path = os.path.join(out_dir, f"parametry_{metoda}.json")
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(parametry, f, indent=2)
-    print(f"💾 Zapisano parametry: {json_path}")
+    # --- Normalizacja formatu parametrów PID ---
+    def normalizuj_parametry(param):
+        """Zamienia dowolny wynik na słownik {'Kp','Ti','Td'}"""
+        if isinstance(param, dict):
+            p = {k.lower(): v for k, v in param.items()}
+            return {
+                "Kp": p.get("kp") or p.get("k") or p.get("p") or "-",
+                "Ti": p.get("ti") or p.get("i") or p.get("taui") or "-",
+                "Td": p.get("td") or p.get("d") or p.get("taud") or "-"
+            }
+        elif isinstance(param, (list, tuple)):
+            vals = list(param) + ["-", "-", "-"]
+            return {"Kp": vals[0], "Ti": vals[1], "Td": vals[2]}
+        elif isinstance(param, (int, float, np.number)):
+            return {"Kp": float(param), "Ti": "-", "Td": "-"}
+        else:
+            return {"Kp": "-", "Ti": "-", "Td": "-"}
 
-        # Ujednolicenie nazw kluczy dla raportu
-    parametry_stand = {}
-    for k, v in parametry.items():
-        k_std = k.lower()
-        if k_std in ["kp", "k", "p"]:
-            parametry_stand["Kp"] = float(v)
-        elif k_std in ["ti", "i", "taui", "integral"]:
-            parametry_stand["Ti"] = float(v)
-        elif k_std in ["td", "d", "taud", "derivative"]:
-            parametry_stand["Td"] = float(v)
-    # jeśli czegoś brakowało, uzupełnij '-'
-    for k in ["Kp", "Ti", "Td"]:
-        if k not in parametry_stand:
-            parametry_stand[k] = "-"
+    parametry_stand = normalizuj_parametry(parametry)
 
-    # Zapisz wyniki do JSON
+    # --- Zapisz do pliku JSON ---
     os.makedirs(out_dir, exist_ok=True)
     json_path = os.path.join(out_dir, f"parametry_{metoda}.json")
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(parametry_stand, f, indent=2)
     print(f"💾 Zapisano parametry PID: {json_path}")
 
-    # Zapisz raport HTML
-    zapisz_raport_html(parametry, metoda, historia, out_dir)
+    # --- Raport HTML ---
+    zapisz_raport_html(parametry_stand, metoda, historia, out_dir)
 
-    return parametry
-
-    
+    return parametry_stand
 
 
 if __name__ == "__main__":
-    # Test lokalny
+    # Test lokalny – wykona strojenie wszystkimi metodami
     for m in ["ziegler_nichols", "siatka", "optymalizacja"]:
         wykonaj_strojenie(m)
