@@ -37,7 +37,7 @@ def zapisz_raport_html(parametry, metoda, historia=None, out_dir="wyniki"):
 
         f.write("<table><tr><th>Parametr</th><th>Wartość</th></tr>")
         for k, v in parametry.items():
-            f.write(f"<tr><td>{k}</td><td>{round(v, 6) if isinstance(v, float) else v}</td></tr>")
+            f.write(f"<tr><td>{k}</td><td>{v}</td></tr>")
         f.write("</table>")
 
         # Dodaj wykres przebiegu optymalizacji, jeśli dostępny
@@ -103,19 +103,25 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
 
     # --- Normalizacja formatu parametrów PID ---
     def normalizuj_parametry(param):
-        """Zamienia dowolny wynik na słownik {'Kp','Ti','Td'}"""
+        """Zamienia dowolny wynik na słownik {'Kp','Ti','Td'} z zaokrągleniem do 2 miejsc."""
+        def fmt(x):
+            try:
+                return round(float(x), 2)
+            except Exception:
+                return "-"
+
         if isinstance(param, dict):
             p = {k.lower(): v for k, v in param.items()}
             return {
-                "Kp": p.get("kp") or p.get("k") or p.get("p") or "-",
-                "Ti": p.get("ti") or p.get("i") or p.get("taui") or "-",
-                "Td": p.get("td") or p.get("d") or p.get("taud") or "-"
+                "Kp": fmt(p.get("kp") or p.get("k") or p.get("p")),
+                "Ti": fmt(p.get("ti") or p.get("i") or p.get("taui")),
+                "Td": fmt(p.get("td") or p.get("d") or p.get("taud")),
             }
         elif isinstance(param, (list, tuple)):
             vals = list(param) + ["-", "-", "-"]
-            return {"Kp": vals[0], "Ti": vals[1], "Td": vals[2]}
+            return {"Kp": fmt(vals[0]), "Ti": fmt(vals[1]), "Td": fmt(vals[2])}
         elif isinstance(param, (int, float, np.number)):
-            return {"Kp": float(param), "Ti": "-", "Td": "-"}
+            return {"Kp": fmt(param), "Ti": "-", "Td": "-"}
         else:
             return {"Kp": "-", "Ti": "-", "Td": "-"}
 
