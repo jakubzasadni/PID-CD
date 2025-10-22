@@ -104,10 +104,34 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
         json.dump(parametry, f, indent=2)
     print(f"💾 Zapisano parametry: {json_path}")
 
+        # Ujednolicenie nazw kluczy dla raportu
+    parametry_stand = {}
+    for k, v in parametry.items():
+        k_std = k.lower()
+        if k_std in ["kp", "k", "p"]:
+            parametry_stand["Kp"] = float(v)
+        elif k_std in ["ti", "i", "taui", "integral"]:
+            parametry_stand["Ti"] = float(v)
+        elif k_std in ["td", "d", "taud", "derivative"]:
+            parametry_stand["Td"] = float(v)
+    # jeśli czegoś brakowało, uzupełnij '-'
+    for k in ["Kp", "Ti", "Td"]:
+        if k not in parametry_stand:
+            parametry_stand[k] = "-"
+
+    # Zapisz wyniki do JSON
+    os.makedirs(out_dir, exist_ok=True)
+    json_path = os.path.join(out_dir, f"parametry_{metoda}.json")
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(parametry_stand, f, indent=2)
+    print(f"💾 Zapisano parametry PID: {json_path}")
+
     # Zapisz raport HTML
     zapisz_raport_html(parametry, metoda, historia, out_dir)
 
     return parametry
+
+    
 
 
 if __name__ == "__main__":
