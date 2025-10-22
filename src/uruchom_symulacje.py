@@ -20,7 +20,7 @@ def dynamiczny_import(typ: str, nazwa: str):
     for attr in dir(modul):
         if attr.lower() == nazwa.lower():
             return getattr(modul, attr)
-    # fallback – zwraca pierwszą klasę nieukrytą
+
     return getattr(modul, [a for a in dir(modul) if not a.startswith("_")][0])
 
 
@@ -37,13 +37,13 @@ def uruchom_symulacje():
     progi_modele = {
         "zbiornik_1rz": {"ts": 60.0, "IAE": 50.0, "Mp": 15.0},
         "dwa_zbiorniki": {"ts": 80.0, "IAE": 80.0, "Mp": 20.0},
-        "wahadlo_odwrocone": {"ts": 10.0, "IAE": 10.0, "Mp": 50.0},  # zaostrzone
+        "wahadlo_odwrocone": {"ts": 10.0, "IAE": 10.0, "Mp": 50.0},
     }
 
     modele = [model_env] if model_env else list(progi_modele.keys())
 
-    print(f"🔧 Wybrany regulator: {regulator_nazwa}")
-    print("🧱 Modele procesów:", ", ".join(modele))
+    print(f"Wybrany regulator: {regulator_nazwa}")
+    print("Modele procesów:", ", ".join(modele))
     print("--------------------------------------------------")
 
     # --- Tryb strojenia ---
@@ -54,7 +54,7 @@ def uruchom_symulacje():
             parametry = wykonaj_strojenie(metoda)
             with open(os.path.join(out_dir, f"parametry_{metoda}.json"), "w") as f:
                 json.dump(parametry, f, indent=2)
-        print("✅ Zakończono strojenie wszystkich metod.")
+        print("Zakończono strojenie wszystkich metod.")
         return
 
     # --- Tryb walidacji ---
@@ -66,7 +66,7 @@ def uruchom_symulacje():
 
         pass_count = 0
         total_count = 0
-        print("\n🧪 [2/3] Walidacja wszystkich metod...")
+        print("\n[2/3] Walidacja wszystkich metod...")
 
         for plik in metody:
             metoda = plik.split("_")[1].split(".")[0]

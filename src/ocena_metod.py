@@ -1,8 +1,8 @@
-# src/ocena_metod.py
 """
 Analiza i porównanie wyników walidacji regulatorów.
 Tworzy raport HTML z kolorowym oznaczeniem PASS/FAIL,
-procentem zaliczonych modeli oraz listę modeli do wdrożenia.
+procentem zaliczonych modeli, tabelą parametrów PID
+oraz listę modeli do wdrożenia.
 """
 
 import os
@@ -63,6 +63,22 @@ def ocena_metod(wyniki_dir: str):
     else:
         print("❌ Żaden model nie spełnił progów jakości — plik passed_models.txt nie zostanie utworzony.")
 
+    # --- Wczytaj parametry PID i raporty strojenia ---
+    parametry_pid = {}
+    raporty_strojenia = {}
+
+    for plik in wyniki_path.glob("parametry_*.json"):
+        metoda = plik.stem.replace("parametry_", "")
+        try:
+            with open(plik, "r") as f:
+                parametry_pid[metoda] = json.load(f)
+        except Exception:
+            parametry_pid[metoda] = {}
+
+    for plik in wyniki_path.glob("raport_strojenie_*.html"):
+        metoda = plik.stem.replace("raport_strojenie_", "")
+        raporty_strojenia[metoda] = plik.name
+
     # --- Generacja raportu HTML ---
     html = []
     html.append("<html><head>")
@@ -74,6 +90,8 @@ def ocena_metod(wyniki_dir: str):
     table { border-collapse: collapse; width: 100%; margin-top: 20px; }
     th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
     th { background-color: #f2f2f2; }
+    a { color: #2b547e; text-decoration: none; }
+    a:hover { text-decoration: underline; }
     .pass { background-color: #c7f7c7; }
     .fail { background-color: #f9c0c0; }
     .summary { margin-top: 30px; font-size: 1.1em; }
@@ -81,6 +99,9 @@ def ocena_metod(wyniki_dir: str):
     html.append("</style>")
     html.append("</head><body>")
     html.append("<h1>Raport walidacji regulatorów</h1>")
+
+    # --- Główna tabela wyników walidacji ---
+    html.append("<h2>📊 Wyniki walidacji</h2>")
     html.append("<table>")
     html.append("<tr><th>Metoda</th><th>Model</th><th>IAE</th><th>ISE</th><th>Mp [%]</th><th>ts [s]</th><th>Status</th></tr>")
 
@@ -96,13 +117,32 @@ def ocena_metod(wyniki_dir: str):
 
     html.append("</table>")
 
-    # --- Podsumowanie ---
-    html.append("<div class='summary'>")
-    html.append("<h2>Podsumowanie metod</h2>")
+    # --- Tabela z parametrami PID ---
+    html.append("<h2>⚙️ Parametry strojenia PID</h2>")
     html.append("<table>")
-    html.append("<tr><th>Metoda</th><th>% PASS</th><th>Średni IAE</th></tr>")
+    html.append("<tr><th>Metoda</th><th>Kp</th><th>Ti</th><th>Td</th><th>Raport strojenia</th></tr>")
+
+    for metoda, p in parametry_pid.items():
+        kp = p.get("Kp", "-")
+        ti = p.get("Ti", "-")
+        td = p.get("Td", "-")
+        raport_link = raporty_strojenia.get(metoda)
+        link_html = f"<a href='{raport_link}' target='_blank'>📄 Otwórz</a>" if raport_link else "-"
+        html.append(f"<tr><td>{metoda}</td><td>{kp}</td><td>{ti}</td><td>{td}</td><td>{link_html}</td></tr>")
+
+    html.append("</table>")
+
+    # --- Podsumowanie metod ---
+    html.append("<div class='summary'>")
+    html.append("<h2>📈 Podsumowanie metod</h2>")
+    html.append("<table>")
+    html.append("<tr><th>Metoda</th><th>% PASS</th><th>Średni IAE</th><th>Raport strojenia</th></tr>")
+
     for m, s in statystyki.items():
-        html.append(f"<tr><td>{m}</td><td>{s['pass_percent']:.1f}%</td><td>{s['avg_IAE']:.2f}</td></tr>")
+        raport_link = raporty_strojenia.get(m)
+        link_html = f"<a href='{raport_link}' target='_blank'>📄</a>" if raport_link else "-"
+        html.append(f"<tr><td>{m}</td><td>{s['pass_percent']:.1f}%</td><td>{s['avg_IAE']:.2f}</td><td>{link_html}</td></tr>")
+
     html.append("</table>")
     html.append(f"<p><b>Najlepszy regulator:</b> <span style='color:green'>{najlepsza_metoda.upper()}</span></p>")
     html.append("</div>")

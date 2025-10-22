@@ -55,7 +55,7 @@ def zapisz_raport_html(parametry, metoda, historia=None, out_dir="wyniki"):
 
         f.write("</body></html>")
 
-    print(f"✅ Zapisano raport HTML: {html_path}")
+    print(f"Zapisano raport HTML: {html_path}")
     return html_path
 
 

@@ -14,8 +14,8 @@ from datetime import datetime
 def main():
     regulator = os.getenv("REGULATOR", "regulator_pid")
     model = os.getenv("MODEL", "zbiornik_1rz")
-    print(f"🔧 Wybrany regulator: {regulator}")
-    print(f"🧱 Model procesu: {model}")
+    print(f"Wybrany regulator: {regulator}")
+    print(f"Model procesu: {model}")
     print("-" * 50)
 
     # Tworzenie folderu wyników z timestampem
@@ -25,12 +25,12 @@ def main():
     os.environ["OUT_DIR"] = raport_folder
 
     # Etap 1: Strojenie
-    print("⚙️ [1/3] Strojenie metodami klasycznymi i optymalizacyjnymi...")
+    print("[1/3] Strojenie metodami klasycznymi i optymalizacyjnymi...")
     os.environ["TRYB"] = "strojenie"
     uruchom_symulacje()
 
     # Etap 2: Walidacja
-    print("\n🧪 [2/3] Walidacja wszystkich metod...")
+    print("\n[2/3] Walidacja wszystkich metod...")
     os.environ["TRYB"] = "walidacja"
     os.environ["REGULATOR"] = regulator
     uruchom_symulacje()
