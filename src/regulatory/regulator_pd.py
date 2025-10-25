@@ -1,14 +1,13 @@
 from src.regulatory.regulator_bazowy import RegulatorBazowy
 
-class regulator_pd(regulator_bazowy):
-    def __init__(self, Kp=1.0, Td=0.0, dt=0.01):
-        super().__init__()
+class regulator_pd(RegulatorBazowy):
+    def __init__(self, Kp=1.0, Td=0.0, dt=0.05):
+        super().__init__(dt)
         self.Kp = float(Kp)
         try:
             self.Td = float(Td)
         except ValueError:
             self.Td = 0.0
-        self.dt = dt
         self.prev_error = 0.0
 
     def update(self, r, y):
@@ -16,4 +15,4 @@ class regulator_pd(regulator_bazowy):
         de = (e - self.prev_error) / self.dt
         u = self.Kp * (e + self.Td * de)
         self.prev_error = e
-        return self._saturate(u)
+        return u
