@@ -1,38 +1,32 @@
-"""
-Elastyczne przeszukiwanie siatki dla dowolnego podzbioru parametrów {Kp, Ti, Td}.
-Przykład wywołania:
-przeszukiwanie_siatki(
-    siatki={"Kp": np.linspace(0.5,5,10), "Ti": np.linspace(5,60,10)}, 
-    funkcja_celu=lambda Kp, Ti, Td=0.0: ...
-)
-"""
+# src/strojenie/przeszukiwanie_siatki.py
+from itertools import product
+from typing import Dict, Callable, Sequence
 
-import itertools
-
-def przeszukiwanie_siatki(siatki: dict, funkcja_celu):
+def przeszukiwanie_siatki(siatki: Dict[str, Sequence[float]], funkcja_celu: Callable):
     """
-    :param siatki: dict z listami/iterowalnymi, np. {"Kp":[...], "Ti":[...]}.
-                   Klucze opcjonalne: "Kp", "Ti", "Td".
-    :param funkcja_celu: funkcja przyjmująca nazwane argumenty: Kp, Ti, Td (nieobowiązkowe).
-    :return: dict {"Kp":..., "Ti":..., "Td":...} (nieobecne klucze pominięte).
-    """
-    keys = [k for k in ["Kp", "Ti", "Td"] if k in siatki]
-    grids = [list(siatki[k]) for k in keys]
+    Uniwersalne przeszukiwanie siatki po dowolnych wymiarach.
+    - `siatki`: słownik {nazwa_parametru: iterowalna lista wartości}
+      np. {"Kp": [...]} albo {"Kp": [...], "Ti": [...]} albo {"Kp": [...], "Ti": [...], "Td": [...]}
+    - `funkcja_celu`: callable przyjmujący **te same nazwy** jako argumenty keyword-only,
+      czyli np.  lambda Kp: ...  /  lambda Kp, Ti: ...  /  lambda Kp, Ti, Td: ...
 
-    best = None
+    Zwraca dict najlepszych parametrów (zaokrąglonych do 2 miejsc).
+    """
+    if not siatki:
+        raise ValueError("siatki nie może być puste")
+
+    keys = list(siatki.keys())
+    grids = [siatki[k] for k in keys]
+
+    best_kwargs = None
     best_val = float("inf")
 
-    for combo in itertools.product(*grids):
-        kwargs = {k: v for k, v in zip(keys, combo)}
-        # domyślne wartości gdy nie podano danego parametru
-        if "Kp" not in kwargs: kwargs["Kp"] = 1.0
-        if "Ti" not in kwargs: kwargs["Ti"] = 30.0
-        if "Td" not in kwargs: kwargs["Td"] = 0.0
-
-        val = funkcja_celu(**kwargs)
+    for values in product(*grids):
+        kwargs = {k: float(v) for k, v in zip(keys, values)}
+        val = funkcja_celu(**kwargs)  # przekazujemy tylko te klucze, które istnieją
         if val < best_val:
             best_val = val
-            best = kwargs.copy()
+            best_kwargs = kwargs
 
-    # przytnij do tych, które faktycznie były w siatkach
-    return {k: best[k] for k in keys}
+    # Zaokrąglenie i zwrot w oryginalnych nazwach (np. "Kp","Ti","Td")
+    return {k: round(v, 2) for k, v in best_kwargs.items()}
