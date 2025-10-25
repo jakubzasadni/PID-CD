@@ -14,25 +14,27 @@ from src.strojenie.przeszukiwanie_siatki import przeszukiwanie_siatki
 from src.strojenie.optymalizacja_numeryczna import optymalizuj_podstawowy
 
 
-def zapisz_raport_html(parametry, metoda, historia=None, out_dir="wyniki"):
+def zapisz_raport_html(parametry, metoda, regulator, historia=None, out_dir="wyniki"):
     """
     Tworzy prosty raport HTML z wynikami strojenia.
     :param parametry: słownik parametrów PID
     :param metoda: nazwa metody strojenia
+    :param regulator: typ regulatora (np. regulator_pid)
     :param historia: lista wartości funkcji celu (dla metod optymalizacji)
     :param out_dir: katalog docelowy
     """
     os.makedirs(out_dir, exist_ok=True)
-    html_path = os.path.join(out_dir, f"raport_strojenie_{metoda}.html")
+    nazwa_html = f"raport_strojenie_{regulator}_{metoda}.html"
+    html_path = os.path.join(out_dir, nazwa_html)
 
     with open(html_path, "w", encoding="utf-8") as f:
         f.write("<html><head><meta charset='utf-8'>")
-        f.write(f"<title>Raport strojenia – {metoda.title()}</title>")
+        f.write(f"<title>Raport strojenia – {metoda.title()} ({regulator})</title>")
         f.write("<style>body{font-family:Arial,sans-serif;margin:20px;} "
                 "table{border-collapse:collapse;} td,th{border:1px solid #aaa;padding:6px;} "
                 "th{background:#ddd;} h2{color:#333;}</style></head><body>")
 
-        f.write(f"<h2>📘 Raport strojenia – metoda: {metoda.title()}</h2>")
+        f.write(f"<h2>📘 Raport strojenia – {regulator.upper()} (metoda: {metoda.title()})</h2>")
         f.write(f"<p>Data: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>")
 
         f.write("<table><tr><th>Parametr</th><th>Wartość</th></tr>")
@@ -46,11 +48,11 @@ def zapisz_raport_html(parametry, metoda, historia=None, out_dir="wyniki"):
             plt.plot(historia, color='blue')
             plt.xlabel("Iteracja")
             plt.ylabel("Funkcja celu (IAE / błąd)")
-            plt.title(f"Postęp optymalizacji – {metoda.title()}")
-            wykres_path = os.path.join(out_dir, f"strojenie_{metoda}.png")
+            plt.title(f"Postęp optymalizacji – {metoda.title()} ({regulator})")
+            wykres_path = os.path.join(out_dir, f"strojenie_{regulator}_{metoda}.png")
             plt.savefig(wykres_path, dpi=120)
             plt.close()
-            f.write(f"<p><img src='strojenie_{metoda}.png' width='600'></p>")
+            f.write(f"<p><img src='strojenie_{regulator}_{metoda}.png' width='600'></p>")
 
         f.write("</body></html>")
 
@@ -58,9 +60,9 @@ def zapisz_raport_html(parametry, metoda, historia=None, out_dir="wyniki"):
     return html_path
 
 
-def wykonaj_strojenie(metoda="ziegler_nichols"):
+def wykonaj_strojenie(metoda="ziegler_nichols", regulator="regulator_pid"):
     """
-    Uruchamia proces strojenia zgodnie z wybraną metodą.
+    Uruchamia proces strojenia zgodnie z wybraną metodą i typem regulatora.
     Zwraca słownik parametrów regulatora w formacie {'Kp', 'Ti', 'Td'}.
     """
     out_dir = "wyniki"
@@ -68,11 +70,11 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
 
     # --- Wybór metody strojenia ---
     if metoda == "ziegler_nichols":
-        print("⚙️ Strojenie metodą Zieglera-Nicholsa...")
+        print(f"⚙️ [{regulator}] Strojenie metodą Zieglera-Nicholsa...")
         parametry = strojenie_PID(Ku=2.0, Tu=25.0)
 
     elif metoda == "siatka":
-        print("⚙️ Strojenie metodą przeszukiwania siatki...")
+        print(f"⚙️ [{regulator}] Strojenie metodą przeszukiwania siatki...")
 
         def funkcja_celu(kp, ti):
             return (kp - 2) ** 2 + (ti - 30) ** 2
@@ -84,7 +86,7 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
         )
 
     elif metoda == "optymalizacja":
-        print("⚙️ Strojenie metodą optymalizacji numerycznej...")
+        print(f"⚙️ [{regulator}] Strojenie metodą optymalizacji numerycznej...")
         historia = []
 
         def funkcja_celu(x):
@@ -101,9 +103,9 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
     else:
         raise ValueError(f"❌ Nieznana metoda strojenia: {metoda}")
 
-    # --- Normalizacja formatu parametrów PID ---
+    # --- Normalizacja formatu parametrów ---
     def normalizuj_parametry(param):
-        """Zamienia dowolny wynik na słownik {'Kp','Ti','Td'} z zaokrągleniem do 2 miejsc."""
+        """Zamienia wynik na słownik {'Kp','Ti','Td'} z zaokrągleniem do 2 miejsc."""
         def fmt(x):
             try:
                 return round(float(x), 2)
@@ -127,20 +129,27 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
 
     parametry_stand = normalizuj_parametry(parametry)
 
+    # --- Dostosowanie do typu regulatora ---
+    if "pi" in regulator.lower():
+        parametry_stand["Td"] = "-"  # brak Td
+    elif "dwupolozeniowy" in regulator.lower():
+        parametry_stand = {"Kp": parametry_stand["Kp"], "Ti": "-", "Td": "-"}
+
     # --- Zapisz do pliku JSON ---
     os.makedirs(out_dir, exist_ok=True)
-    json_path = os.path.join(out_dir, f"parametry_{metoda}.json")
+    json_path = os.path.join(out_dir, f"parametry_{regulator}_{metoda}.json")
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(parametry_stand, f, indent=2)
-    print(f"💾 Zapisano parametry PID: {json_path}")
+    print(f"💾 Zapisano parametry: {json_path}")
 
     # --- Raport HTML ---
-    zapisz_raport_html(parametry_stand, metoda, historia, out_dir)
+    zapisz_raport_html(parametry_stand, metoda, regulator, historia, out_dir)
 
     return parametry_stand
 
 
 if __name__ == "__main__":
-    # Test lokalny – wykona strojenie wszystkimi metodami
-    for m in ["ziegler_nichols", "siatka", "optymalizacja"]:
-        wykonaj_strojenie(m)
+    # Test lokalny – wykona strojenie wszystkimi metodami dla PID, PI i dwupołożeniowego
+    for reg in ["regulator_pid", "regulator_pi", "regulator_dwupolozeniowy"]:
+        for m in ["ziegler_nichols", "siatka", "optymalizacja"]:
+            wykonaj_strojenie(m, reg)
