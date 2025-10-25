@@ -103,43 +103,66 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
 
     # --- 1) Wyznacz parametry pełne (Kp, Ti, Td) ---
     if metoda == "ziegler_nichols":
-        pelne = strojenie_PID(Ku=2.0, Tu=25.0)
+        # ZN daje sensowne PID; dla PI/P/Td i tak przytniemy niżej
+        pelne = strojenie_PID(Ku=2.0, Tu=25.0)  # -> Kp≈1.2, Ti≈12.5, Td≈3.12
 
     elif metoda == "siatka":
-        pelne = przeszukiwanie_siatki(
-            siatki={"Kp": np.linspace(0.5, 5.0, 10),
-                    "Ti": np.linspace(5, 60, 10),
-                    "Td": np.linspace(0.0, 10.0, 6)},
-            funkcja_celu=lambda Kp, Ti, Td: (Kp - 2)**2 + (Ti - 30)**2 + (Td - 0)**2
-        )
+        # Siatki i funkcje celu dopasowane do typu regulatora
+        if regulator == "regulator_p":
+            pelne = przeszukiwanie_siatki(
+                siatki={"Kp": np.linspace(0.5, 5.0, 20)},
+                funkcja_celu=lambda Kp: (Kp - 2.0) ** 2
+            )
+
+        elif regulator == "regulator_pi":
+            pelne = przeszukiwanie_siatki(
+                siatki={"Kp": np.linspace(0.5, 5.0, 20),
+                        "Ti": np.linspace(5, 60, 30)},
+                funkcja_celu=lambda Kp, Ti: (Kp - 2.0) ** 2 + (Ti - 30.0) ** 2
+            )
+
+        elif regulator == "regulator_pd":
+            pelne = przeszukiwanie_siatki(
+                siatki={"Kp": np.linspace(0.5, 5.0, 20),
+                        "Td": np.linspace(0.0, 10.0, 21)},
+                funkcja_celu=lambda Kp, Td: (Kp - 2.0) ** 2 + (Td - 3.0) ** 2  # ⬅ Td celujemy ≈3.0
+            )
+
+        else:  # PID
+            pelne = przeszukiwanie_siatki(
+                siatki={"Kp": np.linspace(0.5, 5.0, 20),
+                        "Ti": np.linspace(5, 60, 30),
+                        "Td": np.linspace(0.0, 10.0, 21)},
+                funkcja_celu=lambda Kp, Ti, Td: (Kp - 2.0) ** 2 + (Ti - 30.0) ** 2 + (Td - 3.0) ** 2
+            )
 
     elif metoda == "optymalizacja":
-        # 🔧 Definicje zależne od typu regulatora
+        # Definicje zależne od typu regulatora (różna liczba zmiennych i cel)
         if regulator == "regulator_p":
-            def f(x): 
-                v = (x[0] - 2)**2; historia.append(v); return v
+            def f(x):
+                v = (x[0] - 2.0) ** 2; historia.append(v); return v
             x0, granice = [1.0], [(0.1, 10)]
         elif regulator == "regulator_pi":
-            def f(x): 
-                v = (x[0] - 2)**2 + (x[1] - 30)**2; historia.append(v); return v
+            def f(x):
+                v = (x[0] - 2.0) ** 2 + (x[1] - 30.0) ** 2; historia.append(v); return v
             x0, granice = [1.0, 20.0], [(0.1, 10), (5, 100)]
         elif regulator == "regulator_pd":
-            def f(x): 
-                v = (x[0] - 2)**2 + (x[1] - 0)**2; historia.append(v); return v
-            x0, granice = [1.0, 0.0], [(0.1, 10), (0.0, 10.0)]
+            def f(x):
+                v = (x[0] - 2.0) ** 2 + (x[1] - 3.0) ** 2; historia.append(v); return v  # ⬅ Td≈3.0
+            x0, granice = [1.0, 1.0], [(0.1, 10), (0.0, 10.0)]
         else:  # PID
-            def f(x): 
-                v = (x[0] - 2)**2 + (x[1] - 30)**2 + (x[2] - 0)**2; historia.append(v); return v
-            x0, granice = [1.0, 20.0, 0.0], [(0.1, 10), (5, 100), (0.0, 10.0)]
+            def f(x):
+                v = (x[0] - 2.0) ** 2 + (x[1] - 30.0) ** 2 + (x[2] - 3.0) ** 2; historia.append(v); return v
+            x0, granice = [1.0, 20.0, 1.0], [(0.1, 10), (5, 100), (0.0, 10.0)]
 
         wynik = optymalizuj_podstawowy(f, x0, granice)
         print(f"🔍 Wynik optymalizacji dla {regulator}: {wynik}")
 
-        # Ujednolicenie formatu
+        # ujednolicenie formatu
         pelne = {
             "Kp": wynik.get("Kp", 1.0),
             "Ti": wynik.get("Ti", 30.0) if "Ti" in wynik else None,
-            "Td": wynik.get("Td", 0.0) if "Td" in wynik else None
+            "Td": wynik.get("Td", 3.0) if "Td" in wynik else None
         }
 
     else:
