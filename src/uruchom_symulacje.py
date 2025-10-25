@@ -32,9 +32,9 @@ def uruchom_symulacje():
     os.makedirs(out_dir, exist_ok=True)
 
     progi_modele = {
-        "zbiornik_1rz": {"ts": 60.0, "IAE": 50.0, "Mp": 15.0},
-        "dwa_zbiorniki": {"ts": 80.0, "IAE": 80.0, "Mp": 20.0},
-        "wahadlo_odwrocone": {"ts": 80.0, "IAE": 10.0, "Mp": 50.0},
+        "zbiornik_1rz": {"ts": 120.0, "IAE": 50.0, "Mp": 15.0},
+        "dwa_zbiorniki": {"ts": 120.0, "IAE": 80.0, "Mp": 20.0},
+        "wahadlo_odwrocone": {"ts": 120.0, "IAE": 10.0, "Mp": 50.0},
     }
     modele = [model_env] if model_env else list(progi_modele.keys())
 
