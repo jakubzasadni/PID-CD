@@ -35,7 +35,6 @@ def _filter_for_regulator(reg_name: str, params: dict) -> dict:
         return {"Kp": _fmt(kp), "Ti": _fmt(ti)}
     if reg == "regulator_pd":
         return {"Kp": _fmt(kp), "Td": _fmt(td)}
-    # domyślnie PID
     return {"Kp": _fmt(kp), "Ti": _fmt(ti), "Td": _fmt(td)}
 
 
@@ -49,7 +48,6 @@ def _zapisz_raport_html(meta, parametry, historia=None, out_dir="wyniki"):
         f.write("<style>body{font-family:Arial,sans-serif;margin:20px;} "
                 "table{border-collapse:collapse;} td,th{border:1px solid #aaa;padding:6px;} "
                 "th{background:#ddd;} h2{color:#333;}</style></head><body>")
-
         f.write(f"<h2>📘 Raport strojenia – {meta['regulator']} / {meta['metoda']}</h2>")
         f.write(f"<p>Data: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>")
 
@@ -90,11 +88,9 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
 
     # --- 1) wyznacz parametry "pełne" (Kp,Ti,Td) ---
     if metoda == "ziegler_nichols":
-        # klasyczny zwraca PID; dla P/PI/PD zetniemy niżej
         pelne = strojenie_PID(Ku=2.0, Tu=25.0)
 
     elif metoda == "siatka":
-        # siatki dopasowane do PID; przycięcie niżej
         pelne = przeszukiwanie_siatki(
             siatki={
                 "Kp": np.linspace(0.5, 5.0, 10),
@@ -108,13 +104,22 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
         historia = []
 
         def f(x):
-            # x = [Kp, Ti, Td]
             wartosc = (x[0] - 2) ** 2 + (x[1] - 30) ** 2 + (x[2] - 0) ** 2
             historia.append(wartosc)
             return wartosc
 
-        x_opt = optymalizuj_podstawowy(f, x0=[1.0, 20.0, 0.0], granice=[(0.1, 10), (5, 100), (0.0, 10.0)])
-        pelne = {"Kp": x_opt[0], "Ti": x_opt[1], "Td": x_opt[2]}
+        wynik = optymalizuj_podstawowy(
+            f,
+            x0=[1.0, 20.0, 0.0],
+            granice=[(0.1, 10), (5, 100), (0.0, 10.0)]
+        )
+
+        # ✅ fix: obsługa słownika zamiast listy
+        if isinstance(wynik, dict):
+            pelne = {"Kp": wynik.get("Kp", 1.0), "Ti": wynik.get("Ti", 30.0), "Td": wynik.get("Td", 0.0)}
+        else:
+            pelne = {"Kp": wynik[0], "Ti": wynik[1], "Td": wynik[2]}
+
     else:
         raise ValueError(f"❌ Nieznana metoda strojenia: {metoda}")
 
