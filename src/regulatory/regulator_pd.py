@@ -1,4 +1,4 @@
-from src.regulatory.regulator_bazowy import regulator_bazowy
+from src.regulatory.regulator_bazowy import RegulatorBazowy
 
 class regulator_pd(regulator_bazowy):
     def __init__(self, Kp=1.0, Td=0.0, dt=0.01):
