@@ -36,15 +36,15 @@ def ocena_metod(wyniki_dir: str):
     regulatory = sorted(list(regulatory))
     modele = sorted(list(modele))
 
-    # Agregacja wyników (średnie metryk i liczba PASS)
+    # Agregacja wyników (średnie metryk i liczba PASS) per regulator
     statystyki = {}
     for reg in regulatory:
         wyniki_r = [r for r in dane if r["regulator"] == reg]
         passy = [r for r in wyniki_r if r["PASS"]]
-        proc_pass = 100 * len(passy) / len(wyniki_r)
-        avg_iae = mean([r["metryki"]["IAE"] for r in wyniki_r])
-        avg_ts = mean([r["metryki"]["czas_ustalania"] for r in wyniki_r])
-        avg_mp = mean([r["metryki"]["przeregulowanie"] for r in wyniki_r])
+        proc_pass = 100 * len(passy) / len(wyniki_r) if wyniki_r else 0.0
+        avg_iae = mean([r["metryki"]["IAE"] for r in wyniki_r]) if wyniki_r else float("inf")
+        avg_ts = mean([r["metryki"]["czas_ustalania"] for r in wyniki_r]) if wyniki_r else float("inf")
+        avg_mp = mean([r["metryki"]["przeregulowanie"] for r in wyniki_r]) if wyniki_r else float("inf")
         statystyki[reg] = {
             "pass_percent": proc_pass,
             "avg_IAE": avg_iae,
@@ -52,7 +52,7 @@ def ocena_metod(wyniki_dir: str):
             "avg_Mp": avg_mp,
         }
 
-    # Wybór najlepszego regulatora
+    # Wybór najlepszego regulatora (po średnim IAE)
     najlepszy_regulator = min(statystyki.keys(), key=lambda r: statystyki[r]["avg_IAE"])
 
     # --- Tworzenie listy modeli do wdrożenia ---
@@ -68,18 +68,47 @@ def ocena_metod(wyniki_dir: str):
     else:
         print("❌ Żaden model nie spełnił progów jakości — plik passed_models.txt nie zostanie utworzony.")
 
-    # --- Wczytaj parametry regulatorów ---
-    parametry_reg = {}
-    for reg in regulatory:
-        pliki_param = sorted(wyniki_path.glob(f"parametry_{reg}_*.json"))
-        if not pliki_param:
-            continue
-        # bierzemy pierwszy plik (bo wszystkie metody dają podobne wyniki)
-        with open(pliki_param[0], "r") as f:
-            parametry = json.load(f)
-        parametry_reg[reg] = parametry
+    # --- Wczytaj parametry z plików strojenia (parametry_{metoda}.json) ---
+    # Zachowujemy w tabeli z kolumnami: Regulator, Metoda, Kp, Ti, Td
+    def _fmt2(x):
+        # Zaokrągla liczby do 2 miejsc, inne wartości (np. "-") zwraca bez zmian
+        try:
+            return f"{float(x):.2f}"
+        except Exception:
+            return x
+
+    parametry_wiersze = []  # lista słowników: {"regulator","metoda","Kp","Ti","Td"}
+    for param_file in sorted(wyniki_path.glob("parametry_*.json")):
+        # nazwa np. parametry_ziegler_nichols.json
+        metoda = param_file.stem.replace("parametry_", "")
+        try:
+            with open(param_file, "r", encoding="utf-8") as f:
+                p = json.load(f)
+        except Exception:
+            p = {}
+
+        # Standaryzacja kluczy na wypadek mieszanej pisowni
+        p_low = {k.lower(): v for k, v in p.items()} if isinstance(p, dict) else {}
+
+        Kp = _fmt2(p_low.get("kp", p.get("Kp", "-")) if isinstance(p, dict) else "-")
+        Ti = _fmt2(p_low.get("ti", p.get("Ti", "-")) if isinstance(p, dict) else "-")
+        Td = _fmt2(p_low.get("td", p.get("Td", "-")) if isinstance(p, dict) else "-")
+
+        # Dla czytelności: regulator w tej tabeli to faktycznie regulator użyty w walidacji (z plików raport_*.json).
+        # Jeśli walidowano tylko jeden regulator, bierzemy pierwszy z 'regulatory'; w przeciwnym razie wpisujemy 'różne'.
+        regulator_label = regulatory[0] if len(regulatory) == 1 else "różne"
+
+        parametry_wiersze.append({
+            "regulator": regulator_label,
+            "metoda": metoda,
+            "Kp": Kp,
+            "Ti": Ti,
+            "Td": Td
+        })
 
     # --- Generacja raportu HTML ---
+    raport_html = wyniki_path / "raport.html"
+
     html = []
     html.append("<html><head>")
     html.append("<meta charset='UTF-8'>")
@@ -133,21 +162,30 @@ def ocena_metod(wyniki_dir: str):
     html.append(f"<p><b>Najlepszy regulator:</b> <span style='color:green'>{najlepszy_regulator.upper()}</span></p>")
     html.append("</div>")
 
-    # --- Parametry regulatorów ---
-    html.append("<h2>Parametry wystrojonych regulatorów</h2>")
-    html.append("<table><tr><th>Regulator</th><th>Parametr</th><th>Wartość</th></tr>")
-    for reg, params in parametry_reg.items():
-        for k, v in params.items():
-            if isinstance(v, (int, float)):
-                val = round(v, 2)
-            else:
-                val = v
-            html.append(f"<tr><td>{reg}</td><td>{k}</td><td>{val}</td></tr>")
-    html.append("</table>")
+    # --- Parametry regulatorów (z etapu strojenia) ---
+    html.append("<h2>Parametry wystrojonych regulatorów (z etapu strojenia)</h2>")
+    if parametry_wiersze:
+        html.append("<table>")
+        html.append("<tr><th>Regulator</th><th>Metoda strojenia</th><th>Kp</th><th>Ti</th><th>Td</th></tr>")
+        for row in parametry_wiersze:
+            html.append(
+                f"<tr><td>{row['regulator']}</td>"
+                f"<td>{row['metoda']}</td>"
+                f"<td>{row['Kp']}</td>"
+                f"<td>{row['Ti']}</td>"
+                f"<td>{row['Td']}</td></tr>"
+            )
+        html.append("</table>")
+        html.append("<p style='font-size:0.95em;color:#555'>Uwaga: dla regulatorów PI kolumna Td pozostaje „–”.</p>")
+    else:
+        html.append("<p>Brak plików z parametrami strojenia (parametry_*.json) w katalogu wyniki/.</p>")
 
     html.append("</body></html>")
 
-    # --- Zapis JSON z wyborem najlepszego regulatora ---
+    # Zapis raportu
+    raport_html.write_text("\n".join(html), encoding="utf-8")
+
+    # --- zapis JSON z wyborem najlepszego regulatora ---
     najlepszy_json = {
         "najlepszy_regulator": najlepszy_regulator,
         "statystyki": statystyki
