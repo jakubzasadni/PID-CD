@@ -29,35 +29,24 @@ def _filter_for_regulator(reg_name: str, params: dict) -> dict:
     """Przytnij słownik parametrów do tych, które mają sens dla danego typu regulatora."""
     reg = reg_name.lower()
 
-    # Normalizuj i bezpiecznie pobierz parametry
     kp = params.get("Kp") or params.get("kp") or 1.0
-    ti = params.get("Ti") or params.get("ti") or 0.0
-    td = params.get("Td") or params.get("td") or 0.0
+    ti = params.get("Ti") or params.get("ti")
+    td = params.get("Td") or params.get("td")
 
-    # Zależnie od typu regulatora
     if reg == "regulator_p":
         return {"Kp": round(float(kp), 2), "Ti": None, "Td": None}
 
     elif reg == "regulator_pi":
-        return {"Kp": round(float(kp), 2), "Ti": round(float(ti), 2), "Td": None}
+        return {"Kp": round(float(kp), 2), "Ti": _fmt(ti), "Td": None}
 
     elif reg == "regulator_pd":
-        # Td może być None, więc zabezpieczenie:
-        try:
-            td_val = round(float(td), 2)
-        except Exception:
-            td_val = 0.0
-        return {"Kp": round(float(kp), 2), "Ti": None, "Td": td_val}
+        return {"Kp": round(float(kp), 2), "Ti": None, "Td": _fmt(td)}
 
     elif reg == "regulator_pid":
-        return {
-            "Kp": round(float(kp), 2),
-            "Ti": round(float(ti), 2),
-            "Td": round(float(td), 2)
-        }
+        return {"Kp": _fmt(kp), "Ti": _fmt(ti), "Td": _fmt(td)}
 
-    # fallback – gdyby doszedł nowy typ
-    return {"Kp": round(float(kp), 2), "Ti": ti, "Td": td}
+    return {"Kp": _fmt(kp), "Ti": _fmt(ti), "Td": _fmt(td)}
+
 
 # ------------------------------------------------------------
 # Generacja raportu HTML
@@ -75,7 +64,7 @@ def _zapisz_raport_html(meta, parametry, historia=None, out_dir="wyniki"):
         f.write(f"<h2>📘 Raport strojenia – {meta['regulator']} / {meta['metoda']}</h2>")
         f.write(f"<p>Data: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>")
 
-        # --- Tabela parametrów ---
+        # Tabela parametrów
         f.write("<table><tr><th>Parametr</th><th>Wartość</th></tr>")
         for k in ["Kp", "Ti", "Td"]:
             val = parametry.get(k)
@@ -84,7 +73,7 @@ def _zapisz_raport_html(meta, parametry, historia=None, out_dir="wyniki"):
             f.write(f"<tr><td>{k}</td><td>{val}</td></tr>")
         f.write("</table>")
 
-        # --- Wykres przebiegu optymalizacji (jeśli jest) ---
+        # Wykres postępu optymalizacji (jeśli dostępny)
         if historia and len(historia) > 1:
             plt.figure()
             plt.plot(historia)
@@ -117,7 +106,7 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
     regulator = os.getenv("REGULATOR", "regulator_pid")  # np. regulator_p / regulator_pd / regulator_pi / regulator_pid
     historia = None
 
-    # --- 1) Wyznacz parametry "pełne" (Kp,Ti,Td) ---
+    # --- 1) Wyznacz parametry pełne (Kp, Ti, Td) ---
     if metoda == "ziegler_nichols":
         pelne = strojenie_PID(Ku=2.0, Tu=25.0)
 
@@ -135,24 +124,42 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
         historia = []
 
         def f(x):
-            wartosc = (x[0] - 2) ** 2 + (x[1] - 30) ** 2 + (x[2] - 0) ** 2
+            reg = os.getenv("REGULATOR", "").lower()
+            if reg == "regulator_p":
+                wartosc = (x[0] - 2) ** 2
+            elif reg == "regulator_pi":
+                wartosc = (x[0] - 2) ** 2 + (x[1] - 30) ** 2
+            elif reg == "regulator_pd":
+                wartosc = (x[0] - 2) ** 2 + (x[1] - 0) ** 2
+            else:
+                wartosc = (x[0] - 2) ** 2 + (x[1] - 30) ** 2 + (x[2] - 0) ** 2
             historia.append(wartosc)
             return wartosc
 
-        wynik = optymalizuj_podstawowy(
-            f,
-            x0=[1.0, 20.0, 0.0],
-            granice=[(0.1, 10), (5, 100), (0.0, 10.0)]
-        )
+        reg = regulator.lower()
+        if reg == "regulator_p":
+            wynik = optymalizuj_podstawowy(f, x0=[1.0], granice=[(0.1, 10)])
+            pelne = {"Kp": wynik.get("Kp", 1.0), "Ti": None, "Td": None}
 
-        if isinstance(wynik, dict):
+        elif reg == "regulator_pi":
+            wynik = optymalizuj_podstawowy(f, x0=[1.0, 20.0], granice=[(0.1, 10), (5, 100)])
+            pelne = {"Kp": wynik.get("Kp", 1.0), "Ti": wynik.get("Ti", 30.0), "Td": None}
+
+        elif reg == "regulator_pd":
+            wynik = optymalizuj_podstawowy(f, x0=[1.0, 0.0], granice=[(0.1, 10), (0.0, 10.0)])
+            pelne = {"Kp": wynik.get("Kp", 1.0), "Ti": None, "Td": wynik.get("Td", 0.0)}
+
+        else:  # PID
+            wynik = optymalizuj_podstawowy(
+                f,
+                x0=[1.0, 20.0, 0.0],
+                granice=[(0.1, 10), (5, 100), (0.0, 10.0)]
+            )
             pelne = {
                 "Kp": wynik.get("Kp", 1.0),
                 "Ti": wynik.get("Ti", 30.0),
                 "Td": wynik.get("Td", 0.0)
             }
-        else:
-            pelne = {"Kp": wynik[0], "Ti": wynik[1], "Td": wynik[2]}
 
     else:
         raise ValueError(f"❌ Nieznana metoda strojenia: {metoda}")
