@@ -23,29 +23,35 @@ def _fmt(v):
         return round(float(v), 2)
     except Exception:
         return "-"
+    
+def _get(params: dict, keys, default=None):
+    for k in keys:
+        if k in params:
+            return params[k]
+    return default
 
+
+def _round_or_none(x, ndigits=2):
+    if x is None:
+        return None
+    try:
+        return round(float(x), ndigits)
+    except Exception:
+        return None
 
 def _filter_for_regulator(reg_name: str, params: dict) -> dict:
-    """Przytnij słownik parametrów do tych, które mają sens dla danego typu regulatora."""
     reg = reg_name.lower()
-
-    kp = params.get("Kp") or params.get("kp") or 1.0
-    ti = params.get("Ti") or params.get("ti")
-    td = params.get("Td") or params.get("td")
+    kp = _get(params, ["Kp", "kp"], 1.0)
+    ti = _get(params, ["Ti", "ti"], None)
+    td = _get(params, ["Td", "td"], None)
 
     if reg == "regulator_p":
-        return {"Kp": round(float(kp), 2), "Ti": None, "Td": None}
-
-    elif reg == "regulator_pi":
-        return {"Kp": round(float(kp), 2), "Ti": _fmt(ti), "Td": None}
-
-    elif reg == "regulator_pd":
-        return {"Kp": round(float(kp), 2), "Ti": None, "Td": _fmt(td)}
-
-    elif reg == "regulator_pid":
-        return {"Kp": _fmt(kp), "Ti": _fmt(ti), "Td": _fmt(td)}
-
-    return {"Kp": _fmt(kp), "Ti": _fmt(ti), "Td": _fmt(td)}
+        return {"Kp": _round_or_none(kp), "Ti": None, "Td": None}
+    if reg == "regulator_pi":
+        return {"Kp": _round_or_none(kp), "Ti": _round_or_none(ti), "Td": None}
+    if reg == "regulator_pd":
+        return {"Kp": _round_or_none(kp), "Ti": None, "Td": _round_or_none(td)}
+    return {"Kp": _round_or_none(kp), "Ti": _round_or_none(ti), "Td": _round_or_none(td)}
 
 
 # ------------------------------------------------------------
