@@ -1,139 +1,95 @@
 """
 Analiza i porównanie wyników walidacji regulatorów.
-Tworzy raport HTML z kolorowym oznaczeniem PASS/FAIL,
-procentem zaliczonych modeli oraz listę modeli do wdrożenia.
-Porównuje regulatory (PID, PI, dwupołożeniowy) między sobą.
+Porównuje regulatory (PID, PI, PD, P), pokazuje metryki i parametry strojenia.
 """
 
-import os
 import json
 from pathlib import Path
 from statistics import mean
 
 
 def ocena_metod(wyniki_dir: str):
-    """
-    Przetwarza raporty z walidacji i generuje zbiorczy raport HTML + listę modeli do wdrożenia.
-    """
     wyniki_path = Path(wyniki_dir)
-    raporty = sorted([f for f in wyniki_path.glob("raport_*.json")])
-
+    raporty = sorted(wyniki_path.glob("raport_*.json"))
     if not raporty:
         print("⚠️ Brak raportów do oceny w katalogu:", wyniki_path)
         return
 
+    # ----- wczytanie wyników -----
     dane = []
     regulatory = set()
-    modele = set()
-
     for plik in raporty:
         with open(plik, "r") as f:
             r = json.load(f)
         regulatory.add(r["regulator"])
-        modele.add(r["model"])
         dane.append(r)
-
     regulatory = sorted(list(regulatory))
-    modele = sorted(list(modele))
 
-    # Agregacja wyników (średnie metryk i liczba PASS) per regulator
-    statystyki = {}
+    # ----- agregaty per regulator -----
+    stat = {}
     for reg in regulatory:
-        wyniki_r = [r for r in dane if r["regulator"] == reg]
-        passy = [r for r in wyniki_r if r["PASS"]]
-        proc_pass = 100 * len(passy) / len(wyniki_r) if wyniki_r else 0.0
-        avg_iae = mean([r["metryki"]["IAE"] for r in wyniki_r]) if wyniki_r else float("inf")
-        avg_ts = mean([r["metryki"]["czas_ustalania"] for r in wyniki_r]) if wyniki_r else float("inf")
-        avg_mp = mean([r["metryki"]["przeregulowanie"] for r in wyniki_r]) if wyniki_r else float("inf")
-        statystyki[reg] = {
-            "pass_percent": proc_pass,
-            "avg_IAE": avg_iae,
-            "avg_ts": avg_ts,
-            "avg_Mp": avg_mp,
+        R = [r for r in dane if r["regulator"] == reg]
+        passy = [r for r in R if r["PASS"]]
+        stat[reg] = {
+            "pass_percent": 100 * len(passy) / len(R) if R else 0.0,
+            "avg_IAE": mean([r["metryki"]["IAE"] for r in R]) if R else float("inf"),
+            "avg_ts": mean([r["metryki"]["czas_ustalania"] for r in R]) if R else float("inf"),
+            "avg_Mp": mean([r["metryki"]["przeregulowanie"] for r in R]) if R else float("inf"),
         }
 
-    # Wybór najlepszego regulatora (po średnim IAE)
-    najlepszy_regulator = min(statystyki.keys(), key=lambda r: statystyki[r]["avg_IAE"])
+    najlepszy = min(stat.keys(), key=lambda k: stat[k]["avg_IAE"])
 
-    # --- Tworzenie listy modeli do wdrożenia ---
-    passed_models = sorted(set([r["model"] for r in dane if r["PASS"]]))
-    passed_models_path = wyniki_path / "passed_models.txt"
-
+    # ----- lista modeli do wdrożenia (dowolny PASS) -----
+    passed_models = sorted({r["model"] for r in dane if r["PASS"]})
     if passed_models:
-        with open(passed_models_path, "w") as f:
-            for model in passed_models:
-                f.write(model + "\n")
-        print(f"✅ Utworzono listę modeli do wdrożenia: {passed_models_path}")
+        (wyniki_path / "passed_models.txt").write_text("\n".join(passed_models), encoding="utf-8")
+        print("✅ Utworzono listę modeli do wdrożenia:", wyniki_path / "passed_models.txt")
         print("Modele:", ", ".join(passed_models))
     else:
-        print("❌ Żaden model nie spełnił progów jakości — plik passed_models.txt nie zostanie utworzony.")
+        print("❌ Żaden model nie spełnił progów — brak passed_models.txt")
 
-    # --- Wczytaj parametry z plików strojenia (parametry_{metoda}.json) ---
-    # Zachowujemy w tabeli z kolumnami: Regulator, Metoda, Kp, Ti, Td
-    def _fmt2(x):
-        # Zaokrągla liczby do 2 miejsc, inne wartości (np. "-") zwraca bez zmian
-        try:
-            return f"{float(x):.2f}"
-        except Exception:
-            return x
+    # ----- parametry z plików parametry_{reg}_{met}.json -----
+    param_files = sorted(wyniki_path.glob("parametry_*.json"))
+    param_rows = []
+    for pf in param_files:
+        with open(pf, "r") as f:
+            blob = json.load(f)
+        reg = blob.get("regulator", "nieznany")
+        met = blob.get("metoda", "nieznana")
+        P = blob.get("parametry", {})
 
-    parametry_wiersze = []  # lista słowników: {"regulator","metoda","Kp","Ti","Td"}
-    for param_file in sorted(wyniki_path.glob("parametry_*.json")):
-        # nazwa np. parametry_ziegler_nichols.json
-        metoda = param_file.stem.replace("parametry_", "")
-        try:
-            with open(param_file, "r", encoding="utf-8") as f:
-                p = json.load(f)
-        except Exception:
-            p = {}
+        row = {"regulator": reg, "metoda": met}
+        # dynamiczne pola
+        for k in ["Kp", "Ti", "Td"]:
+            v = P.get(k, None)
+            if isinstance(v, (int, float)):
+                row[k] = round(float(v), 2)
+            elif v is None:
+                row[k] = "-"
+            else:
+                row[k] = v
+        param_rows.append(row)
 
-        # Standaryzacja kluczy na wypadek mieszanej pisowni
-        p_low = {k.lower(): v for k, v in p.items()} if isinstance(p, dict) else {}
-
-        Kp = _fmt2(p_low.get("kp", p.get("Kp", "-")) if isinstance(p, dict) else "-")
-        Ti = _fmt2(p_low.get("ti", p.get("Ti", "-")) if isinstance(p, dict) else "-")
-        Td = _fmt2(p_low.get("td", p.get("Td", "-")) if isinstance(p, dict) else "-")
-
-        # Dla czytelności: regulator w tej tabeli to faktycznie regulator użyty w walidacji (z plików raport_*.json).
-        # Jeśli walidowano tylko jeden regulator, bierzemy pierwszy z 'regulatory'; w przeciwnym razie wpisujemy 'różne'.
-        regulator_label = regulatory[0] if len(regulatory) == 1 else "różne"
-
-        parametry_wiersze.append({
-            "regulator": regulator_label,
-            "metoda": metoda,
-            "Kp": Kp,
-            "Ti": Ti,
-            "Td": Td
-        })
-
-    # --- Generacja raportu HTML ---
-    raport_html = wyniki_path / "raport.html"
-
+    # ----- HTML -----
     html = []
-    html.append("<html><head>")
-    html.append("<meta charset='UTF-8'>")
-    html.append("<style>")
-    html.append("""
-    body { font-family: Arial, sans-serif; margin: 40px; }
-    h1 { color: #2b547e; }
-    h2 { margin-top: 40px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-    th { background-color: #f2f2f2; }
-    .pass { background-color: #c7f7c7; }
-    .fail { background-color: #f9c0c0; }
-    .summary { margin-top: 30px; font-size: 1.1em; }
-    """)
-    html.append("</style>")
-    html.append("</head><body>")
-
-    html.append("<h1>Raport walidacji regulatorów</h1>")
-
-    # --- Szczegółowa tabela z wynikami wszystkich testów ---
-    html.append("<h2>Wyniki walidacji poszczególnych modeli</h2>")
-    html.append("<table>")
-    html.append("<tr><th>Regulator</th><th>Metoda</th><th>Model</th>"
-                "<th>IAE</th><th>ISE</th><th>Mp [%]</th><th>ts [s]</th><th>Status</th></tr>")
+    html += [
+        "<html><head><meta charset='UTF-8'><style>",
+        """
+        body { font-family: Arial, sans-serif; margin: 36px; }
+        h1 { color: #2b547e; }
+        h2 { margin-top: 36px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background-color: #f2f2f2; }
+        .pass { background-color: #c7f7c7; }
+        .fail { background-color: #f9c0c0; }
+        """,
+        "</style></head><body>",
+        "<h1>Raport walidacji regulatorów</h1>",
+        "<h2>Wyniki walidacji</h2>",
+        "<table>",
+        "<tr><th>Regulator</th><th>Metoda strojenia</th><th>Model</th><th>IAE</th><th>ISE</th><th>Mp [%]</th><th>ts [s]</th><th>Status</th></tr>"
+    ]
 
     for r in dane:
         cls = "pass" if r["PASS"] else "fail"
@@ -144,58 +100,35 @@ def ocena_metod(wyniki_dir: str):
             f"<td>{m['przeregulowanie']:.1f}</td><td>{m['czas_ustalania']:.1f}</td>"
             f"<td>{'✅ PASS' if r['PASS'] else '❌ FAIL'}</td></tr>"
         )
-
     html.append("</table>")
 
-    # --- Podsumowanie regulatorów ---
-    html.append("<div class='summary'>")
-    html.append("<h2>Podsumowanie regulatorów</h2>")
-    html.append("<table>")
-    html.append("<tr><th>Regulator</th><th>% PASS</th><th>Średni IAE</th><th>Średni ts [s]</th><th>Średni Mp [%]</th></tr>")
-    for reg, s in statystyki.items():
-        html.append(f"<tr><td>{reg}</td>"
-                    f"<td>{s['pass_percent']:.1f}%</td>"
-                    f"<td>{s['avg_IAE']:.2f}</td>"
-                    f"<td>{s['avg_ts']:.2f}</td>"
-                    f"<td>{s['avg_Mp']:.1f}</td></tr>")
+    # Podsumowanie
+    html += [
+        "<h2>Podsumowanie regulatorów</h2>",
+        "<table><tr><th>Regulator</th><th>% PASS</th><th>Średni IAE</th><th>Średni ts [s]</th><th>Średni Mp [%]</th></tr>"
+    ]
+    for reg, s in stat.items():
+        html.append(f"<tr><td>{reg}</td><td>{s['pass_percent']:.1f}%</td><td>{s['avg_IAE']:.2f}</td>"
+                    f"<td>{s['avg_ts']:.2f}</td><td>{s['avg_Mp']:.1f}</td></tr>")
     html.append("</table>")
-    html.append(f"<p><b>Najlepszy regulator:</b> <span style='color:green'>{najlepszy_regulator.upper()}</span></p>")
-    html.append("</div>")
+    html.append(f"<p><b>Najlepszy regulator (wg średniego IAE):</b> <span style='color:green'>{najlepszy.upper()}</span></p>")
 
-    # --- Parametry regulatorów (z etapu strojenia) ---
-    html.append("<h2>Parametry wystrojonych regulatorów (z etapu strojenia)</h2>")
-    if parametry_wiersze:
-        html.append("<table>")
-        html.append("<tr><th>Regulator</th><th>Metoda strojenia</th><th>Kp</th><th>Ti</th><th>Td</th></tr>")
-        for row in parametry_wiersze:
-            html.append(
-                f"<tr><td>{row['regulator']}</td>"
-                f"<td>{row['metoda']}</td>"
-                f"<td>{row['Kp']}</td>"
-                f"<td>{row['Ti']}</td>"
-                f"<td>{row['Td']}</td></tr>"
-            )
-        html.append("</table>")
-        html.append("<p style='font-size:0.95em;color:#555'>Uwaga: dla regulatorów PI kolumna Td pozostaje „–”.</p>")
-    else:
-        html.append("<p>Brak plików z parametrami strojenia (parametry_*.json) w katalogu wyniki/.</p>")
+    # Parametry
+    html += [
+        "<h2>Parametry strojenia</h2>",
+        "<table><tr><th>Regulator</th><th>Metoda strojenia</th><th>Kp</th><th>Ti</th><th>Td</th></tr>"
+    ]
+    for row in param_rows:
+        html.append(f"<tr><td>{row['regulator']}</td><td>{row['metoda']}</td>"
+                    f"<td>{row.get('Kp','-')}</td><td>{row.get('Ti','-')}</td><td>{row.get('Td','-')}</td></tr>")
+    html.append("</table>")
 
     html.append("</body></html>")
 
-    # Zapis raportu
+    raport_html = wyniki_path / "raport.html"
     raport_html.write_text("\n".join(html), encoding="utf-8")
-
-    # --- zapis JSON z wyborem najlepszego regulatora ---
-    najlepszy_json = {
-        "najlepszy_regulator": najlepszy_regulator,
-        "statystyki": statystyki
-    }
-    with open(wyniki_path / "najlepszy_regulator.json", "w") as f:
-        json.dump(najlepszy_json, f, indent=2)
-
     print(f"✅ Raport HTML zapisano jako: {raport_html}")
-    print(f"✅ Najlepszy regulator: {najlepszy_regulator.upper()} "
-          f"(średni IAE={statystyki[najlepszy_regulator]['avg_IAE']:.2f})")
+    print(f"✅ Najlepszy regulator: {najlepszy.upper()} (średni IAE={stat[najlepszy]['avg_IAE']:.2f})")
 
 
 if __name__ == "__main__":

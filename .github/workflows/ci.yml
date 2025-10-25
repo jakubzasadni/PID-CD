@@ -10,9 +10,10 @@ on:
         type: choice
         options:
           - all
-          - regulator_pid
+          - regulator_p
           - regulator_pi
-          - regulator_dwupolozeniowy
+          - regulator_pd
+          - regulator_pid
 
 jobs:
   # -----------------------------------------------------
