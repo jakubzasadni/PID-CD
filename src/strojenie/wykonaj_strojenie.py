@@ -18,12 +18,6 @@ from src.strojenie.optymalizacja_numeryczna import optymalizuj_podstawowy
 # ------------------------------------------------------------
 # Pomocnicze funkcje formatowania i filtrowania
 # ------------------------------------------------------------
-def _fmt(v):
-    try:
-        return round(float(v), 2)
-    except Exception:
-        return "-"
-    
 def _get(params: dict, keys, default=None):
     for k in keys:
         if k in params:
@@ -39,7 +33,9 @@ def _round_or_none(x, ndigits=2):
     except Exception:
         return None
 
+
 def _filter_for_regulator(reg_name: str, params: dict) -> dict:
+    """Zwraca tylko te parametry, które mają sens dla danego typu regulatora."""
     reg = reg_name.lower()
     kp = _get(params, ["Kp", "kp"], 1.0)
     ti = _get(params, ["Ti", "ti"], None)
@@ -74,12 +70,10 @@ def _zapisz_raport_html(meta, parametry, historia=None, out_dir="wyniki"):
         f.write("<table><tr><th>Parametr</th><th>Wartość</th></tr>")
         for k in ["Kp", "Ti", "Td"]:
             val = parametry.get(k)
-            if val is None or val == "":
-                val = "-"
-            f.write(f"<tr><td>{k}</td><td>{val}</td></tr>")
+            f.write(f"<tr><td>{k}</td><td>{'-' if val is None else val}</td></tr>")
         f.write("</table>")
 
-        # Wykres postępu optymalizacji (jeśli dostępny)
+        # wykres postępu optymalizacji
         if historia and len(historia) > 1:
             plt.figure()
             plt.plot(historia)
@@ -101,16 +95,11 @@ def _zapisz_raport_html(meta, parametry, historia=None, out_dir="wyniki"):
 # Główna funkcja strojenia
 # ------------------------------------------------------------
 def wykonaj_strojenie(metoda="ziegler_nichols"):
-    """
-    Uruchamia proces strojenia zgodnie z wybraną metodą.
-    Metoda zwraca parametry już przycięte do aktualnego typu REGULATOR (env).
-    Wynik zapisuje jako: wyniki/parametry_{REGULATOR}_{metoda}.json
-    """
     out_dir = "wyniki"
     os.makedirs(out_dir, exist_ok=True)
 
-    regulator = os.getenv("REGULATOR", "regulator_pid")  # np. regulator_p / regulator_pd / regulator_pi / regulator_pid
-    historia = None
+    regulator = os.getenv("REGULATOR", "regulator_pid").lower()
+    historia = []
 
     # --- 1) Wyznacz parametry pełne (Kp, Ti, Td) ---
     if metoda == "ziegler_nichols":
@@ -118,54 +107,40 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
 
     elif metoda == "siatka":
         pelne = przeszukiwanie_siatki(
-            siatki={
-                "Kp": np.linspace(0.5, 5.0, 10),
-                "Ti": np.linspace(5, 60, 10),
-                "Td": np.linspace(0.0, 10.0, 6)
-            },
-            funkcja_celu=lambda Kp, Ti, Td: (Kp - 2) ** 2 + (Ti - 30) ** 2 + (Td - 0) ** 2
+            siatki={"Kp": np.linspace(0.5, 5.0, 10),
+                    "Ti": np.linspace(5, 60, 10),
+                    "Td": np.linspace(0.0, 10.0, 6)},
+            funkcja_celu=lambda Kp, Ti, Td: (Kp - 2)**2 + (Ti - 30)**2 + (Td - 0)**2
         )
 
     elif metoda == "optymalizacja":
-        historia = []
-
-        def f(x):
-            reg = os.getenv("REGULATOR", "").lower()
-            if reg == "regulator_p":
-                wartosc = (x[0] - 2) ** 2
-            elif reg == "regulator_pi":
-                wartosc = (x[0] - 2) ** 2 + (x[1] - 30) ** 2
-            elif reg == "regulator_pd":
-                wartosc = (x[0] - 2) ** 2 + (x[1] - 0) ** 2
-            else:
-                wartosc = (x[0] - 2) ** 2 + (x[1] - 30) ** 2 + (x[2] - 0) ** 2
-            historia.append(wartosc)
-            return wartosc
-
-        reg = regulator.lower()
-        if reg == "regulator_p":
-            wynik = optymalizuj_podstawowy(f, x0=[1.0], granice=[(0.1, 10)])
-            pelne = {"Kp": wynik.get("Kp", 1.0), "Ti": None, "Td": None}
-
-        elif reg == "regulator_pi":
-            wynik = optymalizuj_podstawowy(f, x0=[1.0, 20.0], granice=[(0.1, 10), (5, 100)])
-            pelne = {"Kp": wynik.get("Kp", 1.0), "Ti": wynik.get("Ti", 30.0), "Td": None}
-
-        elif reg == "regulator_pd":
-            wynik = optymalizuj_podstawowy(f, x0=[1.0, 0.0], granice=[(0.1, 10), (0.0, 10.0)])
-            pelne = {"Kp": wynik.get("Kp", 1.0), "Ti": None, "Td": wynik.get("Td", 0.0)}
-
+        # 🔧 Definicje zależne od typu regulatora
+        if regulator == "regulator_p":
+            def f(x): 
+                v = (x[0] - 2)**2; historia.append(v); return v
+            x0, granice = [1.0], [(0.1, 10)]
+        elif regulator == "regulator_pi":
+            def f(x): 
+                v = (x[0] - 2)**2 + (x[1] - 30)**2; historia.append(v); return v
+            x0, granice = [1.0, 20.0], [(0.1, 10), (5, 100)]
+        elif regulator == "regulator_pd":
+            def f(x): 
+                v = (x[0] - 2)**2 + (x[1] - 0)**2; historia.append(v); return v
+            x0, granice = [1.0, 0.0], [(0.1, 10), (0.0, 10.0)]
         else:  # PID
-            wynik = optymalizuj_podstawowy(
-                f,
-                x0=[1.0, 20.0, 0.0],
-                granice=[(0.1, 10), (5, 100), (0.0, 10.0)]
-            )
-            pelne = {
-                "Kp": wynik.get("Kp", 1.0),
-                "Ti": wynik.get("Ti", 30.0),
-                "Td": wynik.get("Td", 0.0)
-            }
+            def f(x): 
+                v = (x[0] - 2)**2 + (x[1] - 30)**2 + (x[2] - 0)**2; historia.append(v); return v
+            x0, granice = [1.0, 20.0, 0.0], [(0.1, 10), (5, 100), (0.0, 10.0)]
+
+        wynik = optymalizuj_podstawowy(f, x0, granice)
+        print(f"🔍 Wynik optymalizacji dla {regulator}: {wynik}")
+
+        # Ujednolicenie formatu
+        pelne = {
+            "Kp": wynik.get("Kp", 1.0),
+            "Ti": wynik.get("Ti", 30.0) if "Ti" in wynik else None,
+            "Td": wynik.get("Td", 0.0) if "Td" in wynik else None
+        }
 
     else:
         raise ValueError(f"❌ Nieznana metoda strojenia: {metoda}")
@@ -187,7 +162,7 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
 
 
 # ------------------------------------------------------------
-# Test lokalny (uruchomienie wszystkich metod)
+# Test lokalny
 # ------------------------------------------------------------
 if __name__ == "__main__":
     for m in ["ziegler_nichols", "siatka", "optymalizacja"]:
