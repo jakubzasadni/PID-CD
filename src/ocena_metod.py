@@ -138,13 +138,14 @@ def ocena_metod(wyniki_dir: str):
     html.append("<table><tr><th>Regulator</th><th>Parametr</th><th>Wartość</th></tr>")
     for reg, params in parametry_reg.items():
         for k, v in params.items():
-            html.append(f"<tr><td>{reg}</td><td>{k}</td><td>{round(v, 2)}</td></tr>")
+            if isinstance(v, (int, float)):
+                val = round(v, 2)
+            else:
+                val = v
+            html.append(f"<tr><td>{reg}</td><td>{k}</td><td>{val}</td></tr>")
     html.append("</table>")
 
     html.append("</body></html>")
-
-    raport_html = wyniki_path / "raport.html"
-    raport_html.write_text("\n".join(html), encoding="utf-8")
 
     # --- Zapis JSON z wyborem najlepszego regulatora ---
     najlepszy_json = {
