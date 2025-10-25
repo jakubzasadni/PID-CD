@@ -30,7 +30,7 @@ jobs:
       - name: Strojenie regulatorów (tylko etap strojenia)
         run: |
           if [ "${{ github.event.inputs.regulator }}" = "all" ]; then
-            for REG in regulator_pid regulator_pi regulator_dwupolozeniowy; do
+            for REG in regulator_p regulator_pi regulator_pd regulator_pid; do
               echo "⚙️ Strojenie regulatora: $REG"
               docker run --rm \
                 -e REGULATOR=$REG \
@@ -74,7 +74,7 @@ jobs:
       - name: Walidacja modelu zbiornik_1rz
         run: |
           if [ "${{ github.event.inputs.regulator }}" = "all" ]; then
-            for REG in regulator_pid regulator_pi regulator_dwupolozeniowy; do
+            for REG in regulator_p regulator_pi regulator_pd regulator_pid; do
               echo "🧪 Walidacja $REG na modelu zbiornik_1rz"
               docker run --rm \
                 -e REGULATOR=$REG \
@@ -113,7 +113,7 @@ jobs:
       - name: Walidacja modelu dwa_zbiorniki
         run: |
           if [ "${{ github.event.inputs.regulator }}" = "all" ]; then
-            for REG in regulator_pid regulator_pi regulator_dwupolozeniowy; do
+            for REG in regulator_p regulator_pi regulator_pd regulator_pid; do
               echo "🧪 Walidacja $REG na modelu dwa_zbiorniki"
               docker run --rm \
                 -e REGULATOR=$REG \
@@ -152,7 +152,7 @@ jobs:
       - name: Walidacja modelu wahadlo_odwrocone
         run: |
           if [ "${{ github.event.inputs.regulator }}" = "all" ]; then
-            for REG in regulator_pid regulator_pi regulator_dwupolozeniowy; do
+            for REG in regulator_p regulator_pi regulator_pd regulator_pid; do
               echo "🧪 Walidacja $REG na modelu wahadlo_odwrocone"
               docker run --rm \
                 -e REGULATOR=$REG \
