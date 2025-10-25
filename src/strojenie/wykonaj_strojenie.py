@@ -28,19 +28,31 @@ def _fmt(v):
 def _filter_for_regulator(reg_name: str, params: dict) -> dict:
     """Przytnij słownik parametrów do tych, które mają sens dla danego typu regulatora."""
     reg = reg_name.lower()
-    kp = params.get("Kp") or params.get("kp") or params.get("k") or params.get("p")
-    ti = params.get("Ti") or params.get("ti") or params.get("i") or params.get("taui")
-    td = params.get("Td") or params.get("td") or params.get("d") or params.get("taud")
 
+    # Normalizuj klucze
+    kp = params.get("Kp") or params.get("kp") or 1.0
+    ti = params.get("Ti") or params.get("ti")
+    td = params.get("Td") or params.get("td")
+
+    # Zależnie od typu regulatora
     if reg == "regulator_p":
-        return {"Kp": _fmt(kp)}
-    if reg == "regulator_pi":
-        return {"Kp": _fmt(kp), "Ti": _fmt(ti)}
-    if reg == "regulator_pd":
-        return {"Kp": _fmt(kp), "Td": _fmt(td)}
-    # domyślnie PID
-    return {"Kp": _fmt(kp), "Ti": _fmt(ti), "Td": _fmt(td)}
+        return {"Kp": round(float(kp), 2), "Ti": None, "Td": None}
 
+    elif reg == "regulator_pi":
+        return {"Kp": round(float(kp), 2), "Ti": round(float(ti), 2), "Td": None}
+
+    elif reg == "regulator_pd":
+        return {"Kp": round(float(kp), 2), "Ti": None, "Td": round(float(td), 2)}
+
+    elif reg == "regulator_pid":
+        return {
+            "Kp": round(float(kp), 2),
+            "Ti": round(float(ti), 2),
+            "Td": round(float(td), 2)
+        }
+
+    # fallback – gdyby doszedł nowy typ
+    return {"Kp": round(float(kp), 2), "Ti": ti, "Td": td}
 
 # ------------------------------------------------------------
 # Generacja raportu HTML
@@ -58,12 +70,16 @@ def _zapisz_raport_html(meta, parametry, historia=None, out_dir="wyniki"):
         f.write(f"<h2>📘 Raport strojenia – {meta['regulator']} / {meta['metoda']}</h2>")
         f.write(f"<p>Data: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>")
 
+        # --- Tabela parametrów ---
         f.write("<table><tr><th>Parametr</th><th>Wartość</th></tr>")
         for k in ["Kp", "Ti", "Td"]:
-            if k in parametry:
-                f.write(f"<tr><td>{k}</td><td>{parametry[k]}</td></tr>")
+            val = parametry.get(k)
+            if val is None or val == "":
+                val = "-"
+            f.write(f"<tr><td>{k}</td><td>{val}</td></tr>")
         f.write("</table>")
 
+        # --- Wykres przebiegu optymalizacji (jeśli jest) ---
         if historia and len(historia) > 1:
             plt.figure()
             plt.plot(historia)
