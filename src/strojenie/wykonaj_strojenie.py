@@ -103,7 +103,7 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
 
     # --- 1) Wyznacz parametry pełne (Kp, Ti, Td) ---
     if metoda == "ziegler_nichols":
-        # ZN daje sensowne PID; dla PI/P/Td i tak przytniemy niżej
+        # ZN daje sensowne PID; dla PI/P/PD i tak przytniemy niżej
         pelne = strojenie_PID(Ku=2.0, Tu=25.0)  # -> Kp≈1.2, Ti≈12.5, Td≈3.12
 
     elif metoda == "siatka":
@@ -125,7 +125,7 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
             pelne = przeszukiwanie_siatki(
                 siatki={"Kp": np.linspace(0.5, 5.0, 20),
                         "Td": np.linspace(0.0, 10.0, 21)},
-                funkcja_celu=lambda Kp, Td: (Kp - 2.0) ** 2 + (Td - 3.0) ** 2  # ⬅ Td celujemy ≈3.0
+                funkcja_celu=lambda Kp, Td: (Kp - 2.0) ** 2 + (Td - 3.0) ** 2
             )
 
         else:  # PID
@@ -141,21 +141,25 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
         if regulator == "regulator_p":
             def f(x):
                 v = (x[0] - 2.0) ** 2; historia.append(v); return v
-            x0, granice = [1.0], [(0.1, 10)]
+            x0, granice, labels = [1.0], [(0.1, 10)], ["Kp"]
+
         elif regulator == "regulator_pi":
             def f(x):
                 v = (x[0] - 2.0) ** 2 + (x[1] - 30.0) ** 2; historia.append(v); return v
-            x0, granice = [1.0, 20.0], [(0.1, 10), (5, 100)]
+            x0, granice, labels = [1.0, 20.0], [(0.1, 10), (5, 100)], ["Kp", "Ti"]
+
         elif regulator == "regulator_pd":
             def f(x):
-                v = (x[0] - 2.0) ** 2 + (x[1] - 3.0) ** 2; historia.append(v); return v  # ⬅ Td≈3.0
-            x0, granice = [1.0, 1.0], [(0.1, 10), (0.0, 10.0)]
+                v = (x[0] - 2.0) ** 2 + (x[1] - 3.0) ** 2; historia.append(v); return v
+            # ⬇ KLUCZOWE: druga współrzędna to Td (etykieta 'Td')
+            x0, granice, labels = [1.0, 1.0], [(0.1, 10), (0.0, 10.0)], ["Kp", "Td"]
+
         else:  # PID
             def f(x):
                 v = (x[0] - 2.0) ** 2 + (x[1] - 30.0) ** 2 + (x[2] - 3.0) ** 2; historia.append(v); return v
-            x0, granice = [1.0, 20.0, 1.0], [(0.1, 10), (5, 100), (0.0, 10.0)]
+            x0, granice, labels = [1.0, 20.0, 1.0], [(0.1, 10), (5, 100), (0.0, 10.0)], ["Kp", "Ti", "Td"]
 
-        wynik = optymalizuj_podstawowy(f, x0, granice)
+        wynik = optymalizuj_podstawowy(f, x0, granice, labels=labels)
         print(f"🔍 Wynik optymalizacji dla {regulator}: {wynik}")
 
         # ujednolicenie formatu

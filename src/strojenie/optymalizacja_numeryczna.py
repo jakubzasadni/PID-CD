@@ -1,22 +1,37 @@
+from typing import Sequence, Iterable, Dict, Optional
 from scipy.optimize import minimize
 
-def optymalizuj_podstawowy(funkcja_celu, x0, granice):
-    """
-    Optymalizuje funkcję celu (np. IAE) metodą Neldera-Meada lub L-BFGS-B.
-    Zwraca słownik zawierający tylko te parametry, które były optymalizowane:
-    np. {'Kp': 1.5}, {'Kp': 2.0, 'Ti': 30.0}, {'Kp': 2.0, 'Td': 0.5}, {'Kp': 2.0, 'Ti': 30.0, 'Td': 3.0}.
-    """
-    wynik = minimize(funkcja_celu, x0, bounds=granice, method="Nelder-Mead")
-    x = wynik.x
 
-    # Tworzymy słownik zależnie od liczby zmiennych
-    n = len(x)
-    if n == 1:
-        return {"Kp": round(float(x[0]), 4)}
-    elif n == 2:
-        return {"Kp": round(float(x[0]), 4), "Ti": round(float(x[1]), 4)}
-    elif n == 3:
-        return {"Kp": round(float(x[0]), 4), "Ti": round(float(x[1]), 4), "Td": round(float(x[2]), 4)}
-    else:
-        # fallback, jeśli przyszłościowo dodasz więcej zmiennych
-        return {f"x{i}": round(float(v), 4) for i, v in enumerate(x)}
+def optymalizuj_podstawowy(
+    funkcja_celu,
+    x0: Sequence[float],
+    granice: Optional[Sequence[tuple]] = None,
+    labels: Optional[Iterable[str]] = None,
+) -> Dict[str, float]:
+    """
+    Minimalny wrapper na scipy.optimize.minimize z obsługą etykiet zmiennych.
+
+    - funkcja_celu: f(x) -> float
+    - x0: wektor startowy (list/tuple)
+    - granice: lista krotek (min, max) lub None
+    - labels: nazwy zmiennych w tej samej kolejności co x0 / granice,
+              np. ["Kp"], ["Kp","Ti"], ["Kp","Td"], ["Kp","Ti","Td"].
+
+    Zwraca słownik {label_i: wartość} z zaokrągleniem do 2 miejsc.
+    """
+    # L-BFGS-B respektuje bounds; Nelder-Mead je ignoruje
+    res = minimize(funkcja_celu, x0, bounds=granice, method="L-BFGS-B")
+    x = res.x
+
+    # Domyślne etykiety (zachowanie wstecznej kompatybilności)
+    if labels is None:
+        labels = []
+        if len(x) >= 1: labels.append("Kp")
+        if len(x) >= 2: labels.append("Ti")
+        if len(x) >= 3: labels.append("Td")
+
+    out: Dict[str, float] = {}
+    for i, name in enumerate(labels):
+        if i < len(x):
+            out[name] = round(float(x[i]), 2)
+    return out
