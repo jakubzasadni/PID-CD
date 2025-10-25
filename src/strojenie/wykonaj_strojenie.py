@@ -29,10 +29,10 @@ def _filter_for_regulator(reg_name: str, params: dict) -> dict:
     """Przytnij słownik parametrów do tych, które mają sens dla danego typu regulatora."""
     reg = reg_name.lower()
 
-    # Normalizuj klucze
+    # Normalizuj i bezpiecznie pobierz parametry
     kp = params.get("Kp") or params.get("kp") or 1.0
-    ti = params.get("Ti") or params.get("ti")
-    td = params.get("Td") or params.get("td")
+    ti = params.get("Ti") or params.get("ti") or 0.0
+    td = params.get("Td") or params.get("td") or 0.0
 
     # Zależnie od typu regulatora
     if reg == "regulator_p":
@@ -42,7 +42,12 @@ def _filter_for_regulator(reg_name: str, params: dict) -> dict:
         return {"Kp": round(float(kp), 2), "Ti": round(float(ti), 2), "Td": None}
 
     elif reg == "regulator_pd":
-        return {"Kp": round(float(kp), 2), "Ti": None, "Td": round(float(td), 2)}
+        # Td może być None, więc zabezpieczenie:
+        try:
+            td_val = round(float(td), 2)
+        except Exception:
+            td_val = 0.0
+        return {"Kp": round(float(kp), 2), "Ti": None, "Td": td_val}
 
     elif reg == "regulator_pid":
         return {
