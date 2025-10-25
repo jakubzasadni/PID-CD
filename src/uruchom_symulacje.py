@@ -25,7 +25,7 @@ def dynamiczny_import(typ: str, nazwa: str):
 
 def uruchom_symulacje():
     regulator_env = os.getenv("REGULATOR", "regulator_pid")  # może być 'all'
-    czas_sym = float(os.getenv("CZAS_SYM", 60.0))
+    czas_sym = float(os.getenv("CZAS_SYM", 120.0))
     tryb = os.getenv("TRYB", "strojenie")
     out_dir = os.getenv("OUT_DIR", "wyniki")
     model_env = os.getenv("MODEL", None)
@@ -34,7 +34,7 @@ def uruchom_symulacje():
     progi_modele = {
         "zbiornik_1rz": {"ts": 60.0, "IAE": 50.0, "Mp": 15.0},
         "dwa_zbiorniki": {"ts": 80.0, "IAE": 80.0, "Mp": 20.0},
-        "wahadlo_odwrocone": {"ts": 10.0, "IAE": 10.0, "Mp": 50.0},
+        "wahadlo_odwrocone": {"ts": 80.0, "IAE": 10.0, "Mp": 50.0},
     }
     modele = [model_env] if model_env else list(progi_modele.keys())
 
