@@ -20,7 +20,7 @@ def oblicz_metryki(t, r, y, settle_band=0.02):
     try:
         max_y = np.max(y)
         steady_state = r[-1]
-        przeregulowanie = max(0.0, (max_y - steady_state) / steady_state * 100.0)
+        przeregulowanie = max(0.0, (max_y - steady_state) / (steady_state if abs(steady_state) > 1e-6 else 1.0) * 100.0)
     except Exception:
         przeregulowanie = 0.0
 

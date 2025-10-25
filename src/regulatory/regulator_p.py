@@ -1,9 +1,10 @@
-from .regulator_bazowy import RegulatorBazowy
+from src.regulatory.regulator_bazowy import regulator_bazowy
 
-class regulator_p(RegulatorBazowy):
-    def __init__(self, Kp=1.0, dt=0.01, **_):
-        super().__init__(dt=dt)
+class regulator_p(regulator_bazowy):
+    def __init__(self, Kp=1.0, dt=0.01):
+        super().__init__()
         self.Kp = float(Kp)
+        self.dt = dt
 
     def update(self, r, y):
         e = r - y

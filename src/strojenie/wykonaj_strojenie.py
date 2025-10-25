@@ -15,6 +15,9 @@ from src.strojenie.przeszukiwanie_siatki import przeszukiwanie_siatki
 from src.strojenie.optymalizacja_numeryczna import optymalizuj_podstawowy
 
 
+# ------------------------------------------------------------
+# Pomocnicze funkcje formatowania i filtrowania
+# ------------------------------------------------------------
 def _fmt(v):
     try:
         return round(float(v), 2)
@@ -35,9 +38,13 @@ def _filter_for_regulator(reg_name: str, params: dict) -> dict:
         return {"Kp": _fmt(kp), "Ti": _fmt(ti)}
     if reg == "regulator_pd":
         return {"Kp": _fmt(kp), "Td": _fmt(td)}
+    # domyślnie PID
     return {"Kp": _fmt(kp), "Ti": _fmt(ti), "Td": _fmt(td)}
 
 
+# ------------------------------------------------------------
+# Generacja raportu HTML
+# ------------------------------------------------------------
 def _zapisz_raport_html(meta, parametry, historia=None, out_dir="wyniki"):
     os.makedirs(out_dir, exist_ok=True)
     html_path = os.path.join(out_dir, f"raport_strojenie_{meta['regulator']}_{meta['metoda']}.html")
@@ -74,6 +81,9 @@ def _zapisz_raport_html(meta, parametry, historia=None, out_dir="wyniki"):
     return html_path
 
 
+# ------------------------------------------------------------
+# Główna funkcja strojenia
+# ------------------------------------------------------------
 def wykonaj_strojenie(metoda="ziegler_nichols"):
     """
     Uruchamia proces strojenia zgodnie z wybraną metodą.
@@ -86,7 +96,7 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
     regulator = os.getenv("REGULATOR", "regulator_pid")  # np. regulator_p / regulator_pd / regulator_pi / regulator_pid
     historia = None
 
-    # --- 1) wyznacz parametry "pełne" (Kp,Ti,Td) ---
+    # --- 1) Wyznacz parametry "pełne" (Kp,Ti,Td) ---
     if metoda == "ziegler_nichols":
         pelne = strojenie_PID(Ku=2.0, Tu=25.0)
 
@@ -114,19 +124,22 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
             granice=[(0.1, 10), (5, 100), (0.0, 10.0)]
         )
 
-        # ✅ fix: obsługa słownika zamiast listy
         if isinstance(wynik, dict):
-            pelne = {"Kp": wynik.get("Kp", 1.0), "Ti": wynik.get("Ti", 30.0), "Td": wynik.get("Td", 0.0)}
+            pelne = {
+                "Kp": wynik.get("Kp", 1.0),
+                "Ti": wynik.get("Ti", 30.0),
+                "Td": wynik.get("Td", 0.0)
+            }
         else:
             pelne = {"Kp": wynik[0], "Ti": wynik[1], "Td": wynik[2]}
 
     else:
         raise ValueError(f"❌ Nieznana metoda strojenia: {metoda}")
 
-    # --- 2) przytnij do typu regulatora ---
+    # --- 2) Przytnij do typu regulatora i zaokrąglij ---
     params = _filter_for_regulator(regulator, pelne)
 
-    # --- 3) zapisz JSON + raport HTML ---
+    # --- 3) Zapisz JSON + raport HTML ---
     meta = {"regulator": regulator, "metoda": metoda}
     out = {"regulator": regulator, "metoda": metoda, "parametry": params}
 
@@ -139,6 +152,9 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
     return params
 
 
+# ------------------------------------------------------------
+# Test lokalny (uruchomienie wszystkich metod)
+# ------------------------------------------------------------
 if __name__ == "__main__":
     for m in ["ziegler_nichols", "siatka", "optymalizacja"]:
         wykonaj_strojenie(m)
