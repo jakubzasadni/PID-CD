@@ -123,7 +123,7 @@ def uruchom_symulacje():
                     y.append(y_nowe)
                     u.append(u_k)
 
-                wyniki = oblicz_metryki(t, r, y)
+                wyniki = oblicz_metryki(t, r, y, u)
 
                 pass_gates = True
                 powod = []
@@ -155,22 +155,54 @@ def uruchom_symulacje():
                 with open(raport_path, "w") as f:
                     json.dump(raport, f, indent=2)
 
-                plt.figure()
-                plt.plot(t, r, label="r")
-                plt.plot(t, y, label="y")
-                plt.plot(t, u, label="u")
-                plt.xlabel("Czas [s]")
-                plt.legend()
-                plt.title(f"{regulator_nazwa} / {metoda} — {model_nazwa} ({'PASS' if pass_gates else 'FAIL'})")
-                plt.savefig(os.path.join(out_dir, f"wykres_{regulator_nazwa}_{metoda}_{model_nazwa}.png"), dpi=120)
+                # Tworzenie wykresu z dwoma osiami Y
+                fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), height_ratios=[2, 1])
+                fig.suptitle(f"{regulator_nazwa} / {metoda} — {model_nazwa}\n({'PASS' if pass_gates else 'FAIL'})", fontsize=12)
+                
+                # Górny wykres: odpowiedź układu
+                ax1.plot(t, r, 'k--', label='Wartość zadana (r)', alpha=0.7)
+                ax1.plot(t, y, 'b-', label='Odpowiedź układu (y)', linewidth=2)
+                ax1.set_xlabel('Czas [s]')
+                ax1.set_ylabel('Wartość')
+                ax1.grid(True, alpha=0.3)
+                ax1.legend(loc='upper right')
+                
+                # Dolny wykres: sygnał sterujący
+                ax2.plot(t, u, 'r-', label='Sterowanie (u)', linewidth=1.5)
+                ax2.set_xlabel('Czas [s]')
+                ax2.set_ylabel('Sterowanie')
+                ax2.grid(True, alpha=0.3)
+                ax2.legend(loc='upper right')
+                
+                # Dodanie informacji o metrykach
+                info_text = (
+                    f"IAE: {wyniki.IAE:.2f}\n"
+                    f"Mp: {wyniki.przeregulowanie:.1f}%\n"
+                    f"ts: {wyniki.czas_ustalania:.1f}s\n"
+                    f"tr: {wyniki.czas_narastania:.1f}s\n"
+                    f"Eu: {wyniki.energia_sterowania:.1f}"
+                )
+                plt.figtext(0.02, 0.02, info_text, fontsize=8, 
+                          bbox=dict(facecolor='white', alpha=0.8))
+                
+                plt.tight_layout()
+                plt.savefig(os.path.join(out_dir, f"wykres_{regulator_nazwa}_{metoda}_{model_nazwa}.png"), 
+                          dpi=150, bbox_inches='tight')
                 plt.close()
 
                 status = "✅" if pass_gates else "❌"
                 if pass_gates:
                     pass_count += 1
-                    print(f"{status} IAE={wyniki.IAE:.2f}, Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s (OK)")
+                    print(f"{status} Wyniki:")
+                    print(f"  • IAE={wyniki.IAE:.2f}, ITAE={wyniki.ITAE:.2f}")
+                    print(f"  • Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s, tr={wyniki.czas_narastania:.1f}s")
+                    print(f"  • Energia sterowania: {wyniki.energia_sterowania:.1f}")
                 else:
-                    print(f"{status} IAE={wyniki.IAE:.2f}, Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s ❌ {', '.join(powod)}")
+                    print(f"{status} Wyniki:")
+                    print(f"  • IAE={wyniki.IAE:.2f}, ITAE={wyniki.ITAE:.2f}")
+                    print(f"  • Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s, tr={wyniki.czas_narastania:.1f}s")
+                    print(f"  • Energia sterowania: {wyniki.energia_sterowania:.1f}")
+                    print(f"  ❌ Niezaliczone kryteria: {', '.join(powod)}")
 
         print("\n--------------------------------------------------")
         print(f"📊 Łącznie PASS: {pass_count}/{total_count} ({100*pass_count/total_count:.1f}%)")
