@@ -123,9 +123,12 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
 
         elif regulator == "regulator_pd":
             pelne = przeszukiwanie_siatki(
-                siatki={"Kp": np.linspace(0.5, 5.0, 20),
-                        "Td": np.linspace(0.0, 10.0, 21)},
-                funkcja_celu=lambda Kp, Td: (Kp - 2.0) ** 2 + (Td - 3.0) ** 2
+                siatki={
+                    "Kp": np.linspace(0.8, 4.0, 17),
+                    "Td": np.linspace(0.0, 1.5, 16)
+                },
+                # preferencja: Kp≈2, Td≈0.8 (łagodne D), bez karania Ti bo PD go nie ma
+                funkcja_celu=lambda Kp, Td: (Kp - 2.0)**2 + 2.0*(Td - 0.8)**2
             )
 
         else:  # PID
@@ -150,9 +153,15 @@ def wykonaj_strojenie(metoda="ziegler_nichols"):
 
         elif regulator == "regulator_pd":
             def f(x):
-                v = (x[0] - 2.0) ** 2 + (x[1] - 3.0) ** 2; historia.append(v); return v
-            # ⬇ KLUCZOWE: druga współrzędna to Td (etykieta 'Td')
-            x0, granice, labels = [1.0, 1.0], [(0.1, 10), (0.0, 10.0)], ["Kp", "Td"]
+                # x = [Kp, Td]
+                v = (x[0] - 2.0)**2 + 2.0*(x[1] - 0.8)**2
+                historia.append(v); 
+                return v
+            x0 = [1.8, 0.6]
+            granice = [(0.8, 4.0), (0.0, 1.5)]
+            wynik = optymalizuj_podstawowy(f, x0, granice)
+            pelne = {"Kp": wynik.get("Kp", 2.0), "Ti": None, "Td": wynik.get("Td", 0.8)}
+
 
         else:  # PID
             def f(x):
