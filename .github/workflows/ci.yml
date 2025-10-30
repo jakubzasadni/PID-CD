@@ -17,7 +17,7 @@ on:
 
 jobs:
   # -----------------------------------------------------
-  # 1️⃣ Strojenie regulatorów
+  # 1️⃣ Strojenie regulatorów (wszystkie metody naraz)
   # -----------------------------------------------------
   tune:
     runs-on: ubuntu-latest
@@ -27,33 +27,31 @@ jobs:
       - name: Build Docker image
         run: docker build -t regulator-sim:test -f kontener/Dockerfile .
 
-      - name: Strojenie regulatorów (tylko etap strojenia)
+      - name: Strojenie regulatorów
         run: |
+          set -e
           mkdir -p wyniki
+          METODY="grid,opt,zn"
           if [ "${{ github.event.inputs.regulator }}" = "all" ]; then
             for REG in regulator_p regulator_pi regulator_pd regulator_pid; do
-              echo "⚙️ Strojenie regulatora: $REG"
+              echo "⚙️ Strojenie: $REG  (metody: $METODY)"
               docker run --rm \
                 -e REGULATOR=$REG \
                 -e TRYB=strojenie \
+                -e METODY_STROJENIA="$METODY" \
+                -e T_TUNE=60 \
                 -v ${{ github.workspace }}/wyniki:/app/wyniki \
                 regulator-sim:test python src/uruchom_symulacje.py
             done
           else
+            echo "⚙️ Strojenie: ${{ github.event.inputs.regulator }}  (metody: $METODY)"
             docker run --rm \
               -e REGULATOR=${{ github.event.inputs.regulator }} \
               -e TRYB=strojenie \
+              -e METODY_STROJENIA="$METODY" \
+              -e T_TUNE=60 \
               -v ${{ github.workspace }}/wyniki:/app/wyniki \
               regulator-sim:test python src/uruchom_symulacje.py
-          fi
-
-      # Fallback: zadbaj, by artefakt istniał nawet gdy nic nie wygenerowano
-      - name: Ensure wyniki dir (and placeholder if empty)
-        run: |
-          mkdir -p wyniki
-          if [ -z "$(ls -A wyniki || true)" ]; then
-            echo '{}' > wyniki/parametry_PLACEHOLDER.json
-            echo '<html><body><h1>No tuning output</h1></body></html>' > wyniki/raport_strojenie_PLACEHOLDER.html
           fi
           ls -la wyniki || true
 
@@ -65,7 +63,7 @@ jobs:
           if-no-files-found: warn
 
   # -----------------------------------------------------
-  # 2️⃣ Walidacja modeli (każdy w osobnym kroku)
+  # 2️⃣ Walidacja modeli (oddzielne joby)
   # -----------------------------------------------------
   validate_zbiornik:
     runs-on: ubuntu-latest
@@ -73,23 +71,20 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-
       - name: Download tuning results
         uses: actions/download-artifact@v4
         with:
           name: wyniki-tune
           path: wyniki/
-        continue-on-error: true
-
       - name: Build Docker image
         run: docker build -t regulator-sim:test -f kontener/Dockerfile .
-
       - name: Walidacja modelu zbiornik_1rz
         run: |
+          set -e
           mkdir -p wyniki
           if [ "${{ github.event.inputs.regulator }}" = "all" ]; then
             for REG in regulator_p regulator_pi regulator_pd regulator_pid; do
-              echo "🧪 Walidacja $REG na modelu zbiornik_1rz"
+              echo "🧪 Walidacja $REG → zbiornik_1rz"
               docker run --rm \
                 -e REGULATOR=$REG \
                 -e TRYB=walidacja \
@@ -105,7 +100,6 @@ jobs:
               -v ${{ github.workspace }}/wyniki:/app/wyniki \
               regulator-sim:test python src/uruchom_symulacje.py || echo "FAIL" > wyniki/result_zbiornik.txt
           fi
-
       - name: Upload partial results
         uses: actions/upload-artifact@v4
         with:
@@ -119,23 +113,20 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-
       - name: Download tuning results
         uses: actions/download-artifact@v4
         with:
           name: wyniki-tune
           path: wyniki/
-        continue-on-error: true
-
       - name: Build Docker image
         run: docker build -t regulator-sim:test -f kontener/Dockerfile .
-
       - name: Walidacja modelu dwa_zbiorniki
         run: |
+          set -e
           mkdir -p wyniki
           if [ "${{ github.event.inputs.regulator }}" = "all" ]; then
             for REG in regulator_p regulator_pi regulator_pd regulator_pid; do
-              echo "🧪 Walidacja $REG na modelu dwa_zbiorniki"
+              echo "🧪 Walidacja $REG → dwa_zbiorniki"
               docker run --rm \
                 -e REGULATOR=$REG \
                 -e TRYB=walidacja \
@@ -151,7 +142,6 @@ jobs:
               -v ${{ github.workspace }}/wyniki:/app/wyniki \
               regulator-sim:test python src/uruchom_symulacje.py || echo "FAIL" > wyniki/result_dwa.txt
           fi
-
       - name: Upload partial results
         uses: actions/upload-artifact@v4
         with:
@@ -165,23 +155,20 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-
       - name: Download tuning results
         uses: actions/download-artifact@v4
         with:
           name: wyniki-tune
           path: wyniki/
-        continue-on-error: true
-
       - name: Build Docker image
         run: docker build -t regulator-sim:test -f kontener/Dockerfile .
-
       - name: Walidacja modelu wahadlo_odwrocone
         run: |
+          set -e
           mkdir -p wyniki
           if [ "${{ github.event.inputs.regulator }}" = "all" ]; then
             for REG in regulator_p regulator_pi regulator_pd regulator_pid; do
-              echo "🧪 Walidacja $REG na modelu wahadlo_odwrocone"
+              echo "🧪 Walidacja $REG → wahadlo_odwrocone"
               docker run --rm \
                 -e REGULATOR=$REG \
                 -e TRYB=walidacja \
@@ -199,7 +186,6 @@ jobs:
               -v ${{ github.workspace }}/wyniki:/app/wyniki \
               regulator-sim:test python src/uruchom_symulacje.py || echo "FAIL" > wyniki/result_wahadlo.txt
           fi
-
       - name: Upload partial results
         uses: actions/upload-artifact@v4
         with:
@@ -208,7 +194,7 @@ jobs:
           if-no-files-found: warn
 
   # -----------------------------------------------------
-  # 3️⃣ Podsumowanie i generacja raportu
+  # 3️⃣ Podsumowanie i raport
   # -----------------------------------------------------
   summary:
     runs-on: ubuntu-latest
@@ -226,39 +212,16 @@ jobs:
           merge-multiple: true
           path: wyniki/
 
-      - name: Move all reports to main wyniki folder
-        run: |
-          echo "Copying results..."
-          mkdir -p wyniki
-          find wyniki -type f -name "*.json" ! -name "*PLACEHOLDER*" -exec cp -f {} wyniki/ \; || true
-          find wyniki -type f -name "*.png"  ! -name "*PLACEHOLDER*" -size +0c -exec cp -f {} wyniki/ \; || true
-          ls -R wyniki || true
-
-      - name: Decide summary mode (data/no-data)
-        id: decide
-        run: |
-          shopt -s nullglob
-          JSONS=(wyniki/raport_*.json wyniki/walidacja_*.json wyniki/parametry_*.json)
-          COUNT=0
-          for f in "${JSONS[@]}"; do
-            [ -e "$f" ] && COUNT=$((COUNT+1))
-          done
-          echo "found_json=$COUNT" >> $GITHUB_OUTPUT
+      - name: (Optional) list wyniki
+        run: ls -R wyniki || true
 
       - name: Generuj raport zbiorczy
-        if: steps.decide.outputs.found_json != '0'
         run: |
           docker run --rm \
             -v ${{ github.workspace }}/wyniki:/app/wyniki \
-            regulator-sim:test python src/ocena_metod.py wyniki
+            regulator-sim:test python src/ocena_metod.py wyniki || echo "⚠️ ocena_metod.py nie wygenerował raportu"
 
-      - name: Fallback raport (brak danych)
-        if: steps.decide.outputs.found_json == '0'
-        run: |
-          mkdir -p wyniki
-          echo '<html><body><h2>Brak danych walidacji – neutralny wynik</h2></body></html>' > wyniki/raport.html
-
-      - name: Sprawdz wyniki i zdecyduj o statusie
+      - name: Sprawdź wyniki i zdecyduj o statusie
         run: |
           cd wyniki
           if [ ! -f raport.html ]; then
@@ -267,14 +230,8 @@ jobs:
           fi
           PASS_COUNT=$(grep -o "✅" raport.html | wc -l || true)
           if [ "$PASS_COUNT" -eq 0 ]; then
-            # gdy są dane, ale nic nie przeszło – FAIL
-            if ls raport_*.json walidacja_*.json parametry_*.json 1>/dev/null 2>&1; then
-              echo "❌ Żaden model nie spełnił progów jakości — pipeline FAIL"
-              exit 1
-            else
-              # brak danych — neutralny PASS
-              echo "ℹ️ Brak danych walidacji — pipeline NEUTRAL PASS"
-            fi
+            echo "❌ Żaden model nie spełnił progów jakości — pipeline FAIL"
+            exit 1
           else
             echo "✅ Walidacja pozytywna — ($PASS_COUNT pozytywnych testów)"
           fi
@@ -301,18 +258,14 @@ jobs:
         with:
           name: raport_${{ github.event.inputs.regulator }}
           path: wyniki/
-        continue-on-error: true
 
       - name: Read passed models
         id: read_models
         run: |
-          echo "Reading model list..."
+          echo "📄 Odczytuję listę modeli..."
           if [ ! -f wyniki/passed_models.txt ]; then
-            echo "⚠️ wyniki/passed_models.txt not found"
             echo "has_models=false" >> $GITHUB_OUTPUT
           else
-            echo "✅ Models to deploy:"
-            cat wyniki/passed_models.txt || true
             MODELS=$(cat wyniki/passed_models.txt | tr '\n' ' ' | xargs)
             echo "models=$MODELS" >> $GITHUB_OUTPUT
             echo "has_models=true" >> $GITHUB_OUTPUT
@@ -333,7 +286,7 @@ jobs:
             SAFE_MODEL=$(echo "$MODEL" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
             OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
             IMAGE="ghcr.io/${OWNER}/${SAFE_MODEL}-regulator:latest"
-            echo "🚀 Building and pushing: $IMAGE"
+            echo "🚀 Build & push: $IMAGE"
             docker build -t "$IMAGE" -f kontener/Dockerfile .
             docker push "$IMAGE"
           done
@@ -345,25 +298,18 @@ jobs:
           GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
         run: |
           set -e
-          echo "Cloning GitOps repo..."
           git clone https://${GH_TOKEN}@github.com/JakubZasadni/cl-gitops-regulatory.git gitops
           cd gitops
-
           for MODEL in ${{ steps.read_models.outputs.models }}; do
             SAFE_MODEL=$(echo "$MODEL" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
-            echo "Updating manifest for: $SAFE_MODEL"
-            yq -i ".spec.template.spec.containers[0].image = \"ghcr.io/${{ github.repository_owner }}/${SAFE_MODEL}-regulator:latest\"" kustomize/apps/${SAFE_MODEL}/base/deployment.yml || echo "⚠️ Missing deployment.yml for $SAFE_MODEL"
+            yq -i ".spec.template.spec.containers[0].image = \"ghcr.io/${{ github.repository_owner }}/${SAFE_MODEL}-regulator:latest\"" kustomize/apps/${SAFE_MODEL}/base/deployment.yml || echo "⚠️ Brak deployment.yml dla $SAFE_MODEL"
           done
-
           git config user.email "ci@github"
           git config user.name "GitHub Actions"
-
-          echo "Checking for changes..."
           if git diff --quiet; then
-            echo "✅ No changes to commit."
+            echo "✅ Brak zmian do commitowania."
           else
-            echo "Committing changes..."
             git add .
             git commit -m "auto-deploy: updated images for passed models"
-            git push origin main || (echo '❌ Git push failed, check GH_TOKEN permissions' && exit 1)
+            git push origin main
           fi
