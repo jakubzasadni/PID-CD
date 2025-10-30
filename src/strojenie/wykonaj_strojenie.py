@@ -6,11 +6,11 @@ import numpy as np
 try:
     # when called as package: src.strojenie.wykonaj_strojenie
     from .przeszukiwanie_siatki import przeszukiwanie_siatki
-    from .optymalizacja_numeryczna import optymalizacja
+    from .optymalizacja_numeryczna import optymalizuj_podstawowy as optymalizacja
 except ImportError:
     # fallback if executed differently
     from src.strojenie.przeszukiwanie_siatki import przeszukiwanie_siatki
-    from src.strojenie.optymalizacja_numeryczna import optymalizacja
+    from src.strojenie.optymalizacja_numeryczna import optymalizuj_podstawowy as optymalizacja
 
 from src.modele.zbiornik_1rz import Zbiornik_1rz
 from src.modele.dwa_zbiorniki import Dwa_zbiorniki
@@ -129,12 +129,12 @@ def strojenie_PID_grid(model_cls=Dwa_zbiorniki, T: float = 120.0):
 
 def strojenie_P_opt(x0=(1.0,), bounds=((0.05, 20.0),), model_cls=Zbiornik_1rz, T: float = 120.0):
     f = lambda x: cel_P(float(x[0]), model_cls=model_cls, T=T)
-    return optymalizacja(f, x0=np.array(x0, dtype=float), bounds=np.array(bounds, dtype=float), method="L-BFGS-B")
+    return optymalizacja(f, x0=[float(x0[0])], granice=list(bounds), labels=["Kp"])
 
 
 def strojenie_PI_opt(x0=(1.0, 10.0), bounds=((0.05, 20.0), (1.0, 200.0)), model_cls=Zbiornik_1rz, T: float = 120.0):
     f = lambda x: cel_PI(float(x[0]), float(x[1]), model_cls=model_cls, T=T)
-    return optymalizacja(f, x0=np.array(x0, dtype=float), bounds=np.array(bounds, dtype=float), method="L-BFGS-B")
+    return optymalizacja(f, x0=[float(x0[0]), float(x0[1])], granice=list(bounds), labels=["Kp", "Ti"])
 
 
 def strojenie_PD_opt(
@@ -143,7 +143,7 @@ def strojenie_PD_opt(
     model_cls=Dwa_zbiorniki, Kr: float = 1.0, T: float = 120.0
 ):
     f = lambda x: cel_PD(float(x[0]), float(x[1]), model_cls=model_cls, Kr=Kr, T=T)
-    return optymalizacja(f, x0=np.array(x0, dtype=float), bounds=np.array(bounds, dtype=float), method="L-BFGS-B")
+    return optymalizacja(f, x0=[float(x0[0]), float(x0[1])], granice=list(bounds), labels=["Kp", "Td"])
 
 
 def strojenie_PID_opt(
@@ -152,7 +152,12 @@ def strojenie_PID_opt(
     model_cls=Dwa_zbiorniki, T: float = 120.0
 ):
     f = lambda x: cel_PID(float(x[0]), float(x[1]), float(x[2]), model_cls=model_cls, T=T)
-    return optymalizacja(f, x0=np.array(x0, dtype=float), bounds=np.array(bounds, dtype=float), method="L-BFGS-B")
+    return optymalizacja(
+        f,
+        x0=[float(x0[0]), float(x0[1]), float(x0[2])],
+        granice=list(bounds),
+        labels=["Kp", "Ti", "Td"],
+    )
 
 
 # ---------- main entry used by uruchom_symulacje.py ----------
