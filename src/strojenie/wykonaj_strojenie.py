@@ -15,7 +15,7 @@ except ImportError:
 try:
     from .ziegler_nichols import policz_zn
 except ImportError:
-    from src.ziegler_nichols import policz_zn
+    from src.strojenie.ziegler_nichols import policz_zn
 
 from src.modele.zbiornik_1rz import Zbiornik_1rz
 from src.modele.dwa_zbiorniki import Dwa_zbiorniki
