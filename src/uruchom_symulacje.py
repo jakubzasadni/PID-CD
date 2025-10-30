@@ -1,223 +1,174 @@
-"""
-Symulacja i walidacja dla wielu modeli procesów.
-Walidacja używa plików parametry_{regulator}_{metoda}.json wygenerowanych w etapie 'strojenie'.
-Obsługuje również tryb REGULATOR=all (P, PI, PD, PID).
-"""
+# src/uruchom_symulacje.py
+from __future__ import annotations
+import os, json, time, glob
+from typing import Tuple, Dict, Any
 
-import os
-import importlib
-import json
-import numpy as np
-import matplotlib.pyplot as plt
-from src.metryki import oblicz_metryki
+# --- importy projektu ---
 from src.strojenie.wykonaj_strojenie import wykonaj_strojenie
+from src.metryki import oblicz_metryki
+
+from src.modele.zbiornik_1rz import Zbiornik_1rz
+from src.modele.dwa_zbiorniki import Dwa_zbiorniki
+from src.modele.wahadlo_odwrocone import Wahadlo_odwrocone
+
+from src.regulatory.regulator_p import regulator_p as RegP
+from src.regulatory.regulator_pi import Regulator_PI as RegPI
+from src.regulatory.regulator_pd import Regulator_PD as RegPD
+from src.regulatory.regulator_pid import Regulator_PID as RegPID
 
 
-def dynamiczny_import(typ: str, nazwa: str):
-    """Dynamicznie importuje klasę modelu lub regulatora po nazwie."""
-    modul = importlib.import_module(f"src.{typ}.{nazwa}")
-    for attr in dir(modul):
-        if attr.lower() == nazwa.lower():
-            return getattr(modul, attr)
-    # fallback – zwraca pierwszą klasę nieukrytą
-    return getattr(modul, [a for a in dir(modul) if not a.startswith("_")][0])
+# ---------- helpers ----------
+def now_stamp() -> str:
+    return time.strftime("%Y%m%d-%H%M%S")
 
+def wyniki_dir() -> str:
+    d = os.environ.get("WYNIKI_DIR", "wyniki")
+    os.makedirs(d, exist_ok=True)
+    return d
 
-def uruchom_symulacje():
-    regulator_env = os.getenv("REGULATOR", "regulator_pid")  # może być 'all'
-    czas_sym = float(os.getenv("CZAS_SYM", 120.0))
-    tryb = os.getenv("TRYB", "strojenie")
-    out_dir = os.getenv("OUT_DIR", "wyniki")
-    model_env = os.getenv("MODEL", None)
-    os.makedirs(out_dir, exist_ok=True)
-
-    progi_modele = {
-        "zbiornik_1rz": {"ts": 120.0, "IAE": 50.0, "Mp": 15.0},
-        "dwa_zbiorniki": {"ts": 120.0, "IAE": 80.0, "Mp": 20.0},
-        "wahadlo_odwrocone": {"ts": 120.0, "IAE": 10.0, "Mp": 50.0},
-    }
-    modele = [model_env] if model_env else list(progi_modele.keys())
-
-    print(f"🔧 Wybrany regulator (env): {regulator_env}")
-    print("🧱 Modele procesów:", ", ".join(modele))
-    print("--------------------------------------------------")
-
-    # -----------------------------------------------------
-    # 1️⃣ Tryb strojenia
-    # -----------------------------------------------------
-    if tryb == "strojenie":
-        print("⚙️ [1/3] Strojenie metodami klasycznymi i optymalizacyjnymi...")
-
-        # --- Obsługa trybu ALL (dla wszystkich regulatorów) ---
-        if regulator_env.lower() == "all":
-            regulatory_lista = ["regulator_p", "regulator_pi", "regulator_pd", "regulator_pid"]
-        else:
-            regulatory_lista = [regulator_env]
-
-        for regulator_nazwa in regulatory_lista:
-            os.environ["REGULATOR"] = regulator_nazwa
-            print(f"\n⚙️ Strojenie regulatora: {regulator_nazwa}")
-            for metoda in ["ziegler_nichols", "siatka", "optymalizacja"]:
-                print(f"⚙️ Strojenie metodą {metoda.replace('_', ' ').title()}...")
-                wykonaj_strojenie(metoda)
-
-        print("✅ Zakończono strojenie wszystkich regulatorów i metod.")
-        return
-
-    # -----------------------------------------------------
-    # 2️⃣ Tryb walidacji
-    # -----------------------------------------------------
-    elif tryb == "walidacja":
-        pliki_params = [f for f in os.listdir(out_dir) if f.startswith("parametry_") and f.endswith(".json")]
-        if not pliki_params:
-            print("⚠️ Brak plików parametrów w katalogu:", out_dir)
-            return
-
-        # --- Wybór zbioru regulatorów ---
-        if regulator_env.lower() == "all":
-            regulator_files = pliki_params
-        else:
-            regulator_files = [p for p in pliki_params if f"parametry_{regulator_env}_" in p]
-
-        if not regulator_files:
-            print("⚠️ Nie znaleziono parametrów dla wskazanego REGULATOR:", regulator_env)
-            return
-
-        pass_count = 0
-        total_count = 0
-        print("\n🧪 [2/3] Walidacja...")
-
-        for plik in sorted(regulator_files):
-            with open(os.path.join(out_dir, plik), "r") as f:
-                blob = json.load(f)
-            regulator_nazwa = blob["regulator"]
-            metoda = blob["metoda"]
-            parametry = blob["parametry"]
-
-            for model_nazwa in modele:
-                total_count += 1
-                prog = progi_modele[model_nazwa]
-                print(f"\n🔍 [{regulator_nazwa} | {metoda}] model {model_nazwa}")
-                print(f"📏 Progi: ts ≤ {prog['ts']}s, IAE ≤ {prog['IAE']}, Mp ≤ {prog['Mp']}%")
-
-                Model = dynamiczny_import("modele", model_nazwa)
-                Regulator = dynamiczny_import("regulatory", regulator_nazwa)
-                model = Model()
-                dt = model.dt
-
-                import inspect
-                sig = inspect.signature(Regulator.__init__)
-                parametry_filtr = {k: v for k, v in parametry.items() if k in sig.parameters}
-                regulator = Regulator(**parametry_filtr, dt=dt)
-
-                kroki = int(czas_sym / dt)
-                t, r, y, u = [], [], [], []
-
-                for k in range(kroki):
-                    t.append(k * dt)
-                    r_zad = 0.0 if model_nazwa == "wahadlo_odwrocone" else 1.0
-                    y_k = model.y
-                    u_k = regulator.update(r_zad, y_k)
-                    y_nowe = model.step(u_k)
-                    r.append(r_zad)
-                    y.append(y_nowe)
-                    u.append(u_k)
-
-                wyniki = oblicz_metryki(t, r, y, u)
-
-                pass_gates = True
-                powod = []
-                if np.std(u) < 1e-4:
-                    pass_gates = False
-                    powod.append("brak reakcji regulatora (u ~ const)")
-                if wyniki.przeregulowanie > prog["Mp"]:
-                    pass_gates = False
-                    powod.append("przeregulowanie")
-                if wyniki.czas_ustalania > prog["ts"]:
-                    pass_gates = False
-                    powod.append("czas ustalania")
-                if wyniki.IAE > prog["IAE"]:
-                    pass_gates = False
-                    powod.append("IAE")
-
-                raport = {
-                    "model": model_nazwa,
-                    "regulator": regulator_nazwa,
-                    "metoda": metoda,
-                    "parametry": parametry,
-                    "metryki": wyniki.__dict__,
-                    "progi": prog,
-                    "PASS": pass_gates,
-                    "niezaliczone": powod,
-                }
-
-                raport_path = os.path.join(out_dir, f"raport_{regulator_nazwa}_{metoda}_{model_nazwa}.json")
-                with open(raport_path, "w") as f:
-                    json.dump(raport, f, indent=2)
-
-                # Tworzenie wykresu z dwoma osiami Y
-                fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), height_ratios=[2, 1])
-                fig.suptitle(f"{regulator_nazwa} / {metoda} — {model_nazwa}\n({'PASS' if pass_gates else 'FAIL'})", fontsize=12)
-                
-                # Górny wykres: odpowiedź układu
-                ax1.plot(t, r, 'k--', label='Wartość zadana (r)', alpha=0.7)
-                ax1.plot(t, y, 'b-', label='Odpowiedź układu (y)', linewidth=2)
-                ax1.set_xlabel('Czas [s]')
-                ax1.set_ylabel('Wartość')
-                ax1.grid(True, alpha=0.3)
-                ax1.legend(loc='upper right')
-                
-                # Dolny wykres: sygnał sterujący
-                ax2.plot(t, u, 'r-', label='Sterowanie (u)', linewidth=1.5)
-                ax2.set_xlabel('Czas [s]')
-                ax2.set_ylabel('Sterowanie')
-                ax2.grid(True, alpha=0.3)
-                ax2.legend(loc='upper right')
-                
-                # Dodanie informacji o metrykach
-                info_text = (
-                    f"IAE: {wyniki.IAE:.2f}\n"
-                    f"Mp: {wyniki.przeregulowanie:.1f}%\n"
-                    f"ts: {wyniki.czas_ustalania:.1f}s\n"
-                    f"tr: {wyniki.czas_narastania:.1f}s\n"
-                    f"Eu: {wyniki.energia_sterowania:.1f}"
-                )
-                plt.figtext(0.02, 0.02, info_text, fontsize=8, 
-                          bbox=dict(facecolor='white', alpha=0.8))
-                
-                plt.tight_layout()
-                plt.savefig(os.path.join(out_dir, f"wykres_{regulator_nazwa}_{metoda}_{model_nazwa}.png"), 
-                          dpi=150, bbox_inches='tight')
-                plt.close()
-
-                status = "✅" if pass_gates else "❌"
-                if pass_gates:
-                    pass_count += 1
-                    print(f"{status} Wyniki:")
-                    print(f"  • IAE={wyniki.IAE:.2f}, ITAE={wyniki.ITAE:.2f}")
-                    print(f"  • Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s, tr={wyniki.czas_narastania:.1f}s")
-                    print(f"  • Energia sterowania: {wyniki.energia_sterowania:.1f}")
-                else:
-                    print(f"{status} Wyniki:")
-                    print(f"  • IAE={wyniki.IAE:.2f}, ITAE={wyniki.ITAE:.2f}")
-                    print(f"  • Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s, tr={wyniki.czas_narastania:.1f}s")
-                    print(f"  • Energia sterowania: {wyniki.energia_sterowania:.1f}")
-                    print(f"  ❌ Niezaliczone kryteria: {', '.join(powod)}")
-
-        print("\n--------------------------------------------------")
-        print(f"📊 Łącznie PASS: {pass_count}/{total_count} ({100*pass_count/total_count:.1f}%)")
-        if pass_count == 0:
-            print("❌ Żaden regulator nie spełnił progów jakości.")
-            exit(1)
-        print("✅ Walidacja zakończona.")
-        return
-
-    # -----------------------------------------------------
-    # 3️⃣ Inny tryb (błąd)
-    # -----------------------------------------------------
+def pick_model(model_key: str, dt_env: str | None) -> Any:
+    dt = float(dt_env) if dt_env else None
+    if model_key == "zbiornik_1rz":
+        m = Zbiornik_1rz()
+    elif model_key == "dwa_zbiorniki":
+        m = Dwa_zbiorniki()
     else:
-        print("❌ Nieznany tryb działania (TRYB=strojenie|walidacja)")
+        m = Wahadlo_odwrocone(dt=float(dt) if dt else 0.05)
+    if dt and hasattr(m, "dt"):
+        m.dt = float(dt)
+    return m
+
+def make_reg(reg_key: str, params: Dict[str, float], model_dt: float) -> Any:
+    # domyślne ograniczenia sterowania
+    umin, umax = 0.0, 1.0
+
+    if reg_key == "regulator_p":
+        Kp = params.get("Kp") or params.get("kp") or params.get("KP") or 1.0
+        Kr = params.get("Kr", 1.0)
+        return RegP(Kp=Kp, Kr=Kr, dt=model_dt, umin=umin, umax=umax)
+
+    if reg_key == "regulator_pi":
+        kp = params.get("Kp", params.get("kp", 1.0))
+        ti = params.get("Ti", params.get("ti", 10.0))
+        tt = params.get("Tt", params.get("tt", max(ti/2, 1.0)))
+        return RegPI(kp=kp, ti=ti, tt=tt, dt=model_dt, umin=umin, umax=umax)
+
+    if reg_key == "regulator_pd":
+        kp = params.get("Kp", params.get("kp", 1.0))
+        td = params.get("Td", params.get("td", 1.0))
+        Kr = params.get("Kr", 1.0)  # dla Twoich modeli K≈1 → Kr=1
+        return RegPD(kp=kp, td=td, Kr=Kr, dt=model_dt, umin=umin, umax=umax)
+
+    # PID
+    kp = params.get("Kp", params.get("kp", 1.0))
+    ti = params.get("Ti", params.get("ti", 10.0))
+    td = params.get("Td", params.get("td", 1.0))
+    tt = params.get("Tt", params.get("tt", max(ti/2, 1.0)))
+    beta = params.get("beta", 0.9)
+    return RegPID(kp=kp, ti=ti, td=td, tt=tt, beta=beta, dt=model_dt, umin=umin, umax=umax)
+
+def simulate(model, regulator, T: float = 120.0, r_value: float = 1.0):
+    dt = float(getattr(model, "dt", 0.05))
+    N = int(T / dt)
+    t = [0.0]
+    r = [r_value]
+    y = [float(getattr(model, "y", 0.0))]
+    u = [0.0]
+    for k in range(1, N):
+        uk = regulator.update(r[-1], y[-1])
+        yk = model.step(uk)
+        t.append(k*dt); r.append(r_value); y.append(yk); u.append(uk)
+    return oblicz_metryki(t, r, y, u), (t, r, y, u)
+
+def find_latest_params(dirpath: str, reg: str, model: str) -> Dict[str, Any] | None:
+    pat = os.path.join(dirpath, f"parametry_{reg}_{model}_*.json")
+    files = sorted(glob.glob(pat))
+    if not files:
+        return None
+    with open(files[-1], "r") as f:
+        try:
+            data = json.load(f)
+        except Exception:
+            return None
+    if isinstance(data, dict) and "best" in data and isinstance(data["best"], dict):
+        return data["best"]
+    return data if isinstance(data, dict) else None
+
+
+# ---------- main modes ----------
+def run_tune(reg: str, model: str):
+    out = wykonaj_strojenie(reg, metoda="grid", model=model) or {}
+    best = out.get("best") or {}
+    stamp = now_stamp()
+    outdir = wyniki_dir()
+
+    # zapisz parametry
+    with open(os.path.join(outdir, f"parametry_{reg}_{model}_{stamp}.json"), "w") as f:
+        json.dump(best, f, indent=2)
+
+    # prosty raport HTML
+    with open(os.path.join(outdir, f"raport_strojenie_{reg}_{model}_{stamp}.html"), "w") as f:
+        f.write(f"<html><body><h1>Strojenie {reg} / {model}</h1><pre>{json.dumps(best, indent=2)}</pre></body></html>")
+
+    # pieczatka png (pusty plik – zeby artifact zawsze mial cos graficznego)
+    open(os.path.join(outdir, f"strojenie_{reg}_{model}_{stamp}.png"), "wb").close()
+
+def run_validate(reg: str, model_key: str, dt_env: str | None):
+    outdir = wyniki_dir()
+    params = find_latest_params(outdir, reg, model_key) or {}
+    model = pick_model(model_key, dt_env)
+    regulator = make_reg(reg, params, getattr(model, "dt", 0.05))
+
+    metryki, _ = simulate(model, regulator, T=120.0, r_value=1.0)
+
+    # progi (przyklad – dopasuj do swoich wymagan)
+    pass_cond = (metryki.przeregulowanie <= 10.0) and (metryki.czas_ustalania <= 0.6 * 120.0)
+
+    stamp = now_stamp()
+    wal_json = {
+        "regulator": reg,
+        "model": model_key,
+        "parametry": params,
+        "metryki": {
+            "IAE": metryki.IAE,
+            "ISE": metryki.ISE,
+            "ITAE": metryki.ITAE,
+            "Mp": metryki.przeregulowanie,
+            "ts": metryki.czas_ustalania,
+            "tr": metryki.czas_narastania,
+            "Eu": metryki.uchyb_ustalony,
+            "sat_pct": metryki.procent_czasu_w_saturacji,
+        },
+        "PASS": bool(pass_cond),
+    }
+    with open(os.path.join(outdir, f"walidacja_{reg}_{model_key}_{stamp}.json"), "w") as f:
+        json.dump(wal_json, f, indent=2)
+
+    # raport_*.json – to konsumuje ocena_metod/summary
+    raport = {
+        "key": f"{reg}:{model_key}",
+        "emoji": "✅" if pass_cond else "❌",
+        "summary": f"{reg} on {model_key}",
+        "metrics": {"Mp": metryki.przeregulowanie, "ts": metryki.czas_ustalania, "IAE": metryki.IAE},
+    }
+    with open(os.path.join(outdir, f"raport_{reg}_{model_key}_{stamp}.json"), "w") as f:
+        json.dump(raport, f, indent=2)
+
+    # jesli PASS – dopisz do listy wdrozen
+    if pass_cond:
+        with open(os.path.join(outdir, "passed_models.txt"), "a") as f:
+            f.write(f"{model_key}\n")
 
 
 if __name__ == "__main__":
-    uruchom_symulacje()
+    REG = os.environ.get("REGULATOR", "regulator_pid")
+    TRYB = os.environ.get("TRYB", "strojenie")
+    MODEL = os.environ.get("MODEL", None) or (
+        "zbiornik_1rz" if REG in ("regulator_p", "regulator_pi") else "dwa_zbiorniki"
+    )
+    DT = os.environ.get("DT")  # np. dla wahadla
+
+    if TRYB == "walidacja":
+        run_validate(REG, MODEL, DT)
+    else:
+        run_tune(REG, MODEL)

@@ -95,7 +95,7 @@ jobs:
                 -e REGULATOR=$REG \
                 -e TRYB=walidacja \
                 -e MODEL=zbiornik_1rz \
-                -v ${{ github.event.workspace }}/wyniki:/app/wyniki \
+                -v ${{ github.workspace }}/wyniki:/app/wyniki \
                 regulator-sim:test python src/uruchom_symulacje.py || echo "FAIL" > wyniki/result_zbiornik.txt
             done
           else
@@ -103,7 +103,7 @@ jobs:
               -e REGULATOR=${{ github.event.inputs.regulator }} \
               -e TRYB=walidacja \
               -e MODEL=zbiornik_1rz \
-              -v ${{ github.event.workspace }}/wyniki:/app/wyniki \
+              -v ${{ github.workspace }}/wyniki:/app/wyniki \
               regulator-sim:test python src/uruchom_symulacje.py || echo "FAIL" > wyniki/result_zbiornik.txt
           fi
 
@@ -141,7 +141,7 @@ jobs:
                 -e REGULATOR=$REG \
                 -e TRYB=walidacja \
                 -e MODEL=dwa_zbiorniki \
-                -v ${{ github.event.workspace }}/wyniki:/app/wyniki \
+                -v ${{ github.workspace }}/wyniki:/app/wyniki \
                 regulator-sim:test python src/uruchom_symulacje.py || echo "FAIL" > wyniki/result_dwa.txt
             done
           else
@@ -149,7 +149,7 @@ jobs:
               -e REGULATOR=${{ github.event.inputs.regulator }} \
               -e TRYB=walidacja \
               -e MODEL=dwa_zbiorniki \
-              -v ${{ github.event.workspace }}/wyniki:/app/wyniki \
+              -v ${{ github.workspace }}/wyniki:/app/wyniki \
               regulator-sim:test python src/uruchom_symulacje.py || echo "FAIL" > wyniki/result_dwa.txt
           fi
 
@@ -188,7 +188,7 @@ jobs:
                 -e TRYB=walidacja \
                 -e MODEL=wahadlo_odwrocone \
                 -e DT=0.005 \
-                -v ${{ github.event.workspace }}/wyniki:/app/wyniki \
+                -v ${{ github.workspace }}/wyniki:/app/wyniki \
                 regulator-sim:test python src/uruchom_symulacje.py || echo "FAIL" > wyniki/result_wahadlo.txt
             done
           else
@@ -197,7 +197,7 @@ jobs:
               -e TRYB=walidacja \
               -e MODEL=wahadlo_odwrocone \
               -e DT=0.005 \
-              -v ${{ github.event.workspace }}/wyniki:/app/wyniki \
+              -v ${{ github.workspace }}/wyniki:/app/wyniki \
               regulator-sim:test python src/uruchom_symulacje.py || echo "FAIL" > wyniki/result_wahadlo.txt
           fi
 
