@@ -16,7 +16,13 @@ from src.modele.zbiornik_1rz import Zbiornik_1rz
 from src.modele.dwa_zbiorniki import Dwa_zbiorniki
 from src.modele.wahadlo_odwrocone import Wahadlo_odwrocone
 
-from src.regulatory.regulator_p import Regulator_P
+# IMPORTANT: in your project the class is named `regulator_p` (lowercase)
+try:
+    from src.regulatory.regulator_p import regulator_p as Regulator_P
+except Exception:
+    # relative fallback if needed
+    from ..regulatory.regulator_p import regulator_p as Regulator_P
+
 from src.regulatory.regulator_pi import Regulator_PI
 from src.regulatory.regulator_pd import Regulator_PD
 from src.regulatory.regulator_pid import Regulator_PID
@@ -51,7 +57,8 @@ def _J(metrics):
 
 def cel_P(Kp: float, model_cls=Zbiornik_1rz, T: float = 120.0) -> float:
     model = model_cls()
-    reg = Regulator_P(kp=Kp, dt=model.dt, umin=0.0, umax=1.0)
+    # your class uses parameters: Kp, Kr, dt, umin, umax
+    reg = Regulator_P(Kp=Kp, Kr=1.0, dt=model.dt, umin=0.0, umax=1.0)
     m, _ = _symuluj(model, reg, T=T, r_value=1.0)
     return _J(m)
 
