@@ -1,0 +1,9 @@
+{
+  "regulator": "regulator_pid",
+  "model": "dwa_zbiorniki",
+  "parametry_regulatora": {
+    "kp": 0.9,
+    "ti": 20.8333333333
+  },
+  "parametry_modelu": {}
+}

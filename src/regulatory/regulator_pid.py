@@ -56,3 +56,8 @@ class RegulatorPID(RegulatorBazowy):
         self.u_prev = self.u
         self.u = u_sat
         return u_sat
+
+
+# Backwards compatibility aliases
+regulator_pid = RegulatorPID
+Regulator_PID = RegulatorPID

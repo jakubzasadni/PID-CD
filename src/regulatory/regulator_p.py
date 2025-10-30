@@ -27,3 +27,8 @@ class RegulatorP(RegulatorBazowy):
         self.u_prev = self.u
         self.u = u
         return u
+
+
+# Backwards compatibility aliases (old code may import by old names)
+regulator_p = RegulatorP
+Regulator_P = RegulatorP

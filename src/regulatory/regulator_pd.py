@@ -52,3 +52,8 @@ class RegulatorPD(RegulatorBazowy):
         self.u_prev = self.u
         self.u = u
         return u
+
+
+# Backwards compatibility aliases
+regulator_pd = RegulatorPD
+Regulator_PD = RegulatorPD
