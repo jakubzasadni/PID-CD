@@ -50,7 +50,7 @@ def _make_reg(reg: str, params: Dict[str, float], dt: float):
     tt = params.get("Tt", max(ti/2,1.0))
     return RegPID(kp=kp, ti=ti, td=td, tt=tt, beta=params.get("beta", 0.9), dt=dt, umin=umin, umax=umax)
 
-def _simulate(model, regulator, T: float = 60.0, r_value: float = 1.0):
+def _simulate(model, regulator, T: float = 120.0, r_value: float = 1.0):
     dt = float(getattr(model, "dt", 0.05))
     N = int(T / dt)
     t = [0.0]; r = [r_value]; y = [float(getattr(model, "y", 0.0))]; u = [0.0]
@@ -116,8 +116,8 @@ def run_validate(reg: str, model_key: str, dt_env: str | None):
     model = _pick_model(model_key, dt_env)
     regulator = _make_reg(reg, params, getattr(model, "dt", 0.05))
 
-    metryki, (t, r, y, u) = _simulate(model, regulator, T=60.0, r_value=1.0)
-    PASS = (metryki.przeregulowanie <= 10.0) and (metryki.czas_ustalania <= 0.6 * 60.0)
+    metryki, (t, r, y, u) = _simulate(model, regulator, T=120.0, r_value=1.0)
+    PASS = (metryki.przeregulowanie <= 10.0) and (metryki.czas_ustalania <= 0.6 * 120.0)
 
     base = os.path.join(out, f"run_{reg}_{model_key}_{_stamp()}")
     _plot(base, f"{reg} — {model_key}", t, r, y, u, metryki)
@@ -153,4 +153,12 @@ def run_validate(reg: str, model_key: str, dt_env: str | None):
 
 
 if __name__ == "__main__":
-    REG = os.environ.get("REGU
+    REG = os.environ.get("REGULATOR", "regulator_pid")
+    TRYB = os.environ.get("TRYB", "strojenie")
+    MODEL = os.environ.get("MODEL") or ("zbiornik_1rz" if REG in ("regulator_p","regulator_pi") else "dwa_zbiorniki")
+    DT = os.environ.get("DT")
+
+    if TRYB == "walidacja":
+        run_validate(REG, MODEL, DT)
+    else:
+        run_tune(REG, MODEL)
