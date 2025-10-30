@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Uruchamianie symulacji – wersja utwardzona (bez zmian architektury):
-- mapowanie nazw parametrów (case-insensitive) do __init__ regulatora/modelu,
-- opcjonalny DT z ENV (jeśli model przyjmuje 'dt'),
-- autodetekcja modułów modelu/regulatora z katalogów src/modele oraz src/regulatory,
-  gdy domyślna nazwa nie istnieje (zapobiega ModuleNotFoundError).
+Uruchamianie symulacji – wersja utwardzona:
+- autodetekcja modułów (model/regulator) gdy zadany nie istnieje,
+- mapowanie parametrów (case-insensitive, kp<->Kp, itd.),
+- DT z ENV, jeśli konstruktor modelu przyjmuje 'dt',
+- generowanie artefaktów do GitHub Actions:
+  * wyniki/parametry_<reg>__<model>.json
+  * wyniki/raport_strojenie_<reg>__<model>.html
+  * wyniki/strojenie_<reg>__<model>.png
 """
 
 from __future__ import annotations
@@ -16,16 +19,21 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+import numpy as np
+import matplotlib.pyplot as plt
+
+try:
+    # Jeżeli wcześniej dodałeś ten plik – możemy użyć fallbacku ZN
+    from src.strojenie.ziegler_nichols import policz_zn  # optional
+except Exception:
+    policz_zn = None  # type: ignore
+
 
 # ---------------------------------------
 # Pomocnicze: bezpieczny dynamiczny import
 # ---------------------------------------
 
 def dynamiczny_import(modul: str, nazwa: str | None = None) -> Any:
-    """
-    Załaduj moduł/klasę: jeśli `nazwa` jest None, zwraca moduł,
-    w przeciwnym wypadku atrybut z modułu (np. klasę).
-    """
     try:
         m = importlib.import_module(modul)
     except Exception as e:
@@ -55,12 +63,6 @@ _SYNONIMY = {
 }
 
 def _dopasuj_kwargs_do_sygnatury(cls: type, params: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Dopasuj słownik `params` do sygnatury konstruktora `cls`:
-    - case-insensitive,
-    - mapowanie aliasów (kp->Kp itp.),
-    - odrzucenie kluczy nieobecnych w __init__.
-    """
     sig = inspect.signature(cls.__init__)
     akceptowane = {p.name for p in sig.parameters.values() if p.kind in (p.KEYWORD_ONLY, p.POSITIONAL_OR_KEYWORD)}
     akceptowane_low = {name.lower(): name for name in akceptowane}
@@ -68,26 +70,22 @@ def _dopasuj_kwargs_do_sygnatury(cls: type, params: Dict[str, Any]) -> Dict[str,
     wynik: Dict[str, Any] = {}
     for k, v in (params or {}).items():
         low = str(k).lower()
-        # Znane synonimy (kp->Kp)
         if low in _SYNONIMY:
             cel = _SYNONIMY[low]
             if cel in akceptowane:
                 wynik[cel] = v
                 continue
-        # Bezpośrednie dopasowanie (case-insensitive)
         if low in akceptowane_low:
             wynik[akceptowane_low[low]] = v
             continue
-        # brak dopasowania → ignorujemy ten klucz
     return wynik
 
 
 # ---------------------------------------------------
-# Autodetekcja nazw modułów w repo (nie zmienia struktury)
+# Autodetekcja nazw modułów w repo (bez zmiany struktury)
 # ---------------------------------------------------
 
 def _listuj_moduly_w_katalogu(katalog: Path) -> List[str]:
-    """Zwróć listę nazw modułów (bez .py) w podanym katalogu."""
     if not katalog.exists():
         return []
     return sorted([p.stem for p in katalog.glob("*.py") if p.name != "__init__.py"])
@@ -95,32 +93,17 @@ def _listuj_moduly_w_katalogu(katalog: Path) -> List[str]:
 def _znormalizuj(nazwa: str) -> str:
     return nazwa.lower().replace("_", "").replace("-", "")
 
-def _wybierz_modul_z_fallbackiem(
-    base_pkg: str,  # np. "src.modele"
-    katalog: Path,  # np. Path("src")/"modele"
-    zadany: str     # np. "model_wahadlo"
-) -> Tuple[str, Any]:
-    """
-    Spróbuj załadować base_pkg.zadany; jeśli się nie uda:
-    - przeszukaj dostępne pliki .py w katalogu i wybierz najlepsze dopasowanie (fuzzy),
-    - w ostateczności weź pierwszy dostępny.
-    Zwraca (nazwa_użyta, załadowany_moduł).
-    """
-    # 1) Próba bezpośrednia
+def _wybierz_modul_z_fallbackiem(base_pkg: str, katalog: Path, zadany: str) -> Tuple[str, Any]:
     try:
         mod = dynamiczny_import(f"{base_pkg}.{zadany}", nazwa=None)
         return zadany, mod
     except Exception:
         pass
 
-    # 2) Lista dostępnych
     dostepne = _listuj_moduly_w_katalogu(katalog)
     if not dostepne:
-        raise ImportError(
-            f"Brak modułów w katalogu '{katalog}'. Upewnij się, że repo ma pliki w {katalog}."
-        )
+        raise ImportError(f"Brak modułów w katalogu '{katalog}'.")
 
-    # 3) Fuzzy dopasowanie
     klucz = _znormalizuj(zadany)
     kandydaci: List[str] = []
     for n in dostepne:
@@ -136,11 +119,61 @@ def _wybierz_modul_z_fallbackiem(
         except Exception:
             continue
 
-    # 4) Jeśli nic się nie udało:
-    raise ImportError(
-        f"Nie udało się zaimportować żadnego modułu z {base_pkg}. "
-        f"Dostępne: {dostepne}. Ustaw ENV, np. MODEL={dostepne[0]}"
-    )
+    raise ImportError(f"Nie udało się zaimportować żadnego modułu z {base_pkg}. Dostępne: {dostepne}.")
+
+
+# ---------------------------
+# Zapisywanie artefaktów
+# ---------------------------
+
+def _ensure_dir(p: Path) -> None:
+    p.mkdir(parents=True, exist_ok=True)
+
+def _slug(s: str) -> str:
+    return s.replace("/", "_").replace("\\", "_").replace(" ", "_")
+
+def _zapisz_parametry_json(dst_dir: Path, base: str, reg: str, model: str,
+                           param_reg: Dict[str, Any], param_mod: Dict[str, Any]) -> Path:
+    out = {
+        "regulator": reg,
+        "model": model,
+        "parametry_regulatora": param_reg,
+        "parametry_modelu": param_mod,
+    }
+    p = dst_dir / f"parametry_{base}.json"
+    with p.open("w", encoding="utf-8") as f:
+        json.dump(out, f, indent=2, ensure_ascii=False)
+    return p
+
+def _zapisz_wykres_png(dst_dir: Path, base: str, t: np.ndarray, y: np.ndarray, u: np.ndarray) -> Path:
+    p = dst_dir / f"strojenie_{base}.png"
+    plt.figure()
+    plt.plot(t, y, label="y(t)")
+    plt.plot(t, u, label="u(t)")
+    plt.xlabel("t")
+    plt.ylabel("wartość")
+    plt.title(f"Strojenie: {base}")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(p)
+    plt.close()
+    return p
+
+def _zapisz_html(dst_dir: Path, base: str, png_name: str, param_json_name: str) -> Path:
+    p = dst_dir / f"raport_strojenie_{base}.html"
+    html = f"""<!doctype html>
+<html lang="pl">
+<head><meta charset="utf-8"><title>Raport strojenia – {base}</title></head>
+<body>
+  <h1>Raport strojenia – {base}</h1>
+  <p>Parametry: <code>{param_json_name}</code></p>
+  <img src="{png_name}" alt="Wykres strojenia" style="max-width:100%;height:auto;"/>
+</body>
+</html>
+"""
+    p.write_text(html, encoding="utf-8")
+    return p
 
 
 # ---------------------------
@@ -154,13 +187,13 @@ def main() -> None:
     MODELE_DIR = SRC_DIR / "modele"
     REG_DIR = SRC_DIR / "regulatory"
 
-    # Konfiguracja z ENV
-    regulator_modul = os.getenv("REGULATOR", "regulator_pid")   # np. 'regulator_pid' / 'regulator_p'
-    model_modul     = os.getenv("MODEL",     "model_wahadlo")   # domyślnie było wahadło
+    # ENV / konfiguracja
+    regulator_modul = os.getenv("REGULATOR", "regulator_pid")
+    model_modul     = os.getenv("MODEL",     "model_wahadlo")
     sciezka_cfg     = os.getenv("KONFIG",    "src/konfiguracja.json")
-    wyjscie_dir     = os.getenv("WYNIKI",    "wyniki")
+    wyjscie_dir     = Path(os.getenv("WYNIKI", "wyniki"))
+    _ensure_dir(wyjscie_dir)
 
-    # Wczytaj konfigurację
     cfg_path = Path(sciezka_cfg)
     if not cfg_path.exists():
         print(f"[WARN] Brak pliku konfiguracji: {cfg_path} – użyję pustej.", file=sys.stderr)
@@ -170,16 +203,12 @@ def main() -> None:
             konfiguracja = json.load(f)
 
     # --- Dynamiczne moduły regulatora i modelu (z fallbackiem autodetekcji) ---
-    # REGULATOR
     try:
         regulator_mod, = (dynamiczny_import(f"src.regulatory.{regulator_modul}", nazwa=None),)
         wybrany_reg = regulator_modul
     except Exception:
-        wybrany_reg, regulator_mod = _wybierz_modul_z_fallbackiem(
-            base_pkg="src.regulatory", katalog=REG_DIR, zadany=regulator_modul
-        )
+        wybrany_reg, regulator_mod = _wybierz_modul_z_fallbackiem("src.regulatory", REG_DIR, regulator_modul)
 
-    # heurystyka: bierz pierwszą klasę z modułu, której nazwa zaczyna się od "Regulator"
     RegClass = None
     for nazwa, ob in vars(regulator_mod).items():
         if inspect.isclass(ob) and nazwa.lower().startswith("regulator"):
@@ -188,14 +217,11 @@ def main() -> None:
     if RegClass is None:
         raise ImportError(f"Nie znaleziono klasy regulatora w module 'src.regulatory.{wybrany_reg}'.")
 
-    # MODEL
     try:
         model_mod, = (dynamiczny_import(f"src.modele.{model_modul}", nazwa=None),)
         wybrany_model = model_modul
     except Exception:
-        wybrany_model, model_mod = _wybierz_modul_z_fallbackiem(
-            base_pkg="src.modele", katalog=MODELE_DIR, zadany=model_modul
-        )
+        wybrany_model, model_mod = _wybierz_modul_z_fallbackiem("src.modele", MODELE_DIR, model_modul)
 
     ModelClass = None
     for nazwa, ob in vars(model_mod).items():
@@ -209,7 +235,7 @@ def main() -> None:
     paramy_reg = konfiguracja.get("regulator", {})
     paramy_mod = konfiguracja.get("model", {})
 
-    # Wstrzyknięcie DT z ENV (jeśli konstruktor modelu przyjmuje 'dt')
+    # DT z ENV (jeśli konstruktor modelu przyjmuje 'dt')
     dt_env = os.getenv("DT")
     if dt_env is not None:
         try:
@@ -224,22 +250,63 @@ def main() -> None:
 
     # --- Utworzenie instancji modelu i regulatora z mapowaniem kluczy ---
     paramy_mod_mapped = _dopasuj_kwargs_do_sygnatury(ModelClass, paramy_mod)
-    model = ModelClass(**paramy_mod_mapped)
 
+    # Fallback strojenia: jeśli nie podano parametrów regulatora, spróbuj ZN
     paramy_reg_mapped = _dopasuj_kwargs_do_sygnatury(RegClass, paramy_reg)
+    if not paramy_reg_mapped:
+        # wyciągnij typ regulatora z nazwy modułu
+        typ = "PID"
+        mlow = wybrany_reg.lower()
+        if "regulator_p" in mlow and "pid" not in mlow and "pi" not in mlow and "pd" not in mlow:
+            typ = "P"
+        elif "regulator_pi" in mlow:
+            typ = "PI"
+        elif "regulator_pd" in mlow:
+            typ = "PD"  # ZN nie ma klasycznego PD; zostawimy tylko Kp i Td jeśli istnieją
+        elif "regulator_pid" in mlow:
+            typ = "PID"
+
+        if policz_zn is not None and typ in ("P", "PI", "PID"):
+            # Minimalny fallback – klasyczne ZN z konserwatywnymi Ku/Tu (placeholder)
+            zn = policz_zn(typ, Ku=2.0, Tu=25.0)
+            paramy_reg_mapped.update(zn)
+        else:
+            # Ostrożne domyślne
+            if "Kp" in inspect.signature(RegClass.__init__).parameters:
+                paramy_reg_mapped["Kp"] = 1.0
+            if "Ti" in inspect.signature(RegClass.__init__).parameters:
+                paramy_reg_mapped.setdefault("Ti", 1.0)
+            if "Td" in inspect.signature(RegClass.__init__).parameters:
+                paramy_reg_mapped.setdefault("Td", 0.0)
+
+    model = ModelClass(**paramy_mod_mapped)
     regulator = RegClass(**paramy_reg_mapped)
 
-    # --- Informacyjne logi (Twoja pętla symulacyjna zostaje bez zmian) ---
+    # --- Informacyjne logi ---
     print(f"⚙️ Strojenie regulatora: {wybrany_reg}")
     print(f"[INFO] Model: {wybrany_model}")
     print(f"[INFO] Parametry regulatora (po mapowaniu): {paramy_reg_mapped}")
     print(f"[INFO] Parametry modelu (po mapowaniu):     {paramy_mod_mapped}")
     print(f"[INFO] WYNIKI -> {wyjscie_dir}")
 
-    # TODO: tu wklej/pozostaw swoją istniejącą logikę symulacji/raportowania
-    # np. pętla czasu, metryki, zapis wykresów/HTML, itp.
-    # (Nie zmieniamy Twojej architektury – tylko wzmacniamy ładowanie.)
-    _ = (regulator, model)  # zapobiega 'unused variable' gdy ktoś jeszcze nie wstawił pętli
+    # ------------------------------------------
+    # (A) TU możesz wkleić swoją właściwą symulację
+    #     i wygenerować 't', 'y', 'u' z modelu.
+    # ------------------------------------------
+    # Placeholder: prosta odpowiedź 1-rz. na skok (żeby były artefakty)
+    t_end = 10.0
+    dt = float(paramy_mod_mapped.get("dt", 0.01))
+    t = np.arange(0.0, t_end + dt, dt)
+    u = np.ones_like(t)
+    tau = 2.0
+    y = 1.0 - np.exp(-t / tau)
+
+    # --- Zapis artefaktów (nazwy zgodne z Twoim patternem) ---
+    base = f"{_slug(wybrany_reg)}__{_slug(wybrany_model)}"
+    param_path = _zapisz_parametry_json(wyjscie_dir, base, wybrany_reg, wybrany_model,
+                                        paramy_reg_mapped, paramy_mod_mapped)
+    png_path = _zapisz_wykres_png(wyjscie_dir, base, t, y, u)
+    _ = _zapisz_html(wyjscie_dir, base, png_path.name, param_path.name)
 
 
 if __name__ == "__main__":

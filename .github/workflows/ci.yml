@@ -46,7 +46,7 @@ jobs:
               regulator-sim:test python src/uruchom_symulacje.py
           fi
 
-      - name: Upload tuning results
+      - name: Upload wyniki-tune artifact
         uses: actions/upload-artifact@v4
         with:
           name: wyniki-tune
@@ -54,6 +54,7 @@ jobs:
             wyniki/parametry_*.json
             wyniki/raport_strojenie_*.html
             wyniki/strojenie_*.png
+          if-no-files-found: error
 
   # -----------------------------------------------------
   # 2️⃣ Walidacja modeli (każdy w osobnym kroku)
