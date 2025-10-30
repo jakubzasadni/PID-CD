@@ -1,75 +1,100 @@
 # src/regulatory/regulator_pd.py
+from __future__ import annotations
 from src.regulatory.regulator_bazowy import RegulatorBazowy
+
 
 class Regulator_PD(RegulatorBazowy):
     """
-    Regulator PD:
-      u = u0 + Kp * (beta*r - y) - Ud
-    gdzie Ud to pochodna po POMIARZE z filtrem 1. rzędu (anti-kick).
-    Dodatkowo: clamp na Ud (ud_max), by zbić szpilki sterowania.
+    Discrete PD controller with:
+      - derivative on measurement (anti-kick) with 1st-order filter,
+      - optional derivative clamp (ud_max),
+      - proportional setpoint weighting (alpha),
+      - optional feed-forward term Kr*r to remove steady-state error
+        for type-0 plants without using integral action,
+      - output saturation (umin/umax).
 
-    Parametry:
-      kp   - wzmocnienie proporcjonalne
-      td   - stała pochodnej [s]
-      n    - „ostrość” filtra D (większe N = ostrzej, ale więcej szumu). 30–60 zwykle ok
-      beta - ważenie zadanego w członie P (0..1). 1 => pełny skok P na r
-      u0   - stała składowa/bias (np. do eliminacji uchybu dla PD)
-      umin, umax - saturacje sterowania
-      ud_max - clamp pochodnej (±ud_max)
-      dt   - krok dyskretyzacji
+    Control law (conceptual):
+        u = u0 + Kr*r + Kp*(alpha*r - y) - Ud
+        Ud(s) = (Td*s) / ((Td/N)*s + 1) * y   (filtered derivative of measurement)
+
+    Notes:
+        - Without integral action, a type-0 plant generally has steady-state error.
+          Use Kr ≈ 1/K (K = plant DC gain) or a proper bias u0 to cancel it,
+          provided the actuator is not saturated.
+        - If Td <= 0 -> no derivative term is applied.
     """
+
     def __init__(
         self,
         kp: float = 1.0,
-        td: float = 3.0,
-        n: float = 50.0,
-        beta: float = 1.0,
-        u0: float = 0.0,
-        umin: float = 0.0,
-        umax: float = 1.0,
-        ud_max: float = 5.0,
+        td: float = 0.0,
+        n: float = 30.0,            # derivative filter sharpness (N >= 1)
+        alpha: float = 1.0,         # setpoint weight in P path
+        Kr: float = 0.0,            # feed-forward gain for reference (set Kr≈1/K to remove steady-state error)
+        u0: float = 0.0,            # static bias
         dt: float = 0.05,
+        umin: float | None = 0.0,
+        umax: float | None = 1.0,
+        ud_max: float | None = None # clamp magnitude of derivative contribution
     ):
-        super().__init__(dt)
+        super().__init__(dt=dt, umin=umin, umax=umax)
         self.kp = float(kp)
         self.td = float(td)
         self.n = float(n)
-        self.beta = float(beta)
+        self.alpha = float(alpha)
+        self.Kr = float(Kr)
         self.u0 = float(u0)
-        self.umin = float(umin)
-        self.umax = float(umax)
-        self.ud_max = float(ud_max)
 
-        # stany wewnętrzne
+        self.ud_max = float(ud_max) if ud_max is not None else None
+
+        # states
         self.ud = 0.0
         self.prev_y = 0.0
 
-    def reset(self):
+    # ---------- helpers ----------
+    def _clip(self, val: float) -> float:
+        if self.umin is not None and val < self.umin:
+            return self.umin
+        if self.umax is not None and val > self.umax:
+            return self.umax
+        return val
+
+    # ---------- API ----------
+    def reset(self) -> None:
         super().reset()
         self.ud = 0.0
         self.prev_y = 0.0
 
     def update(self, r: float, y: float) -> float:
-        # P z ważeniem setpointu (ogranicza kick od r)
-        e_p = self.beta * r - y
-        up = self.kp * e_p
+        # P path with setpoint weighting
+        up = self.kp * (self.alpha * r - y)
 
-        # D po pomiarze, filtr 1. rzędu: Ud[k] = a*Ud[k-1] + b*(y[k]-y[k-1])
-        if self.td > 0.0 and self.n > 0.0:
-            a = self.td / (self.td + self.n * self.dt)
-            b = (self.kp * self.td * self.n) / (self.td + self.n * self.dt)
-            dy = y - self.prev_y
+        # derivative on measurement (filtered)
+        if self.td > 0.0 and self.dt > 0.0:
+            dy = (y - self.prev_y) / self.dt
+            Td_over_N = self.td / max(self.n, 1e-9)
+            a = Td_over_N / (Td_over_N + self.dt)
+            b = self.td / (Td_over_N + self.dt)
             self.ud = a * self.ud + b * dy
 
-            # clamp na pochodnej (gasi szpilki)
-            if self.ud > self.ud_max:
-                self.ud = self.ud_max
-            elif self.ud < -self.ud_max:
-                self.ud = -self.ud_max
+            if self.ud_max is not None:
+                if self.ud > self.ud_max:
+                    self.ud = self.ud_max
+                elif self.ud < -self.ud_max:
+                    self.ud = -self.ud_max
         else:
             self.ud = 0.0
 
-        u_unsat = self.u0 + up - self.ud
-        self.u = max(self.umin, min(self.umax, u_unsat))
+        # feed-forward + bias
+        uff = self.Kr * r + self.u0
+
+        # unsaturated output
+        u_unsat = uff + up - self.ud
+
+        # saturation
+        u_sat = self._clip(u_unsat)
+
+        # finalize
+        self.u = u_sat
         self.prev_y = float(y)
         return self.u
