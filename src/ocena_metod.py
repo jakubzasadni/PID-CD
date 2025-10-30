@@ -10,6 +10,7 @@ class Wpis:
     model: str
     emoji: str
     metrics: Dict[str, float]
+    plot: str | None
     src: str
 
 def _read_json(fp: str) -> Dict[str, Any] | None:
@@ -19,70 +20,78 @@ def _read_json(fp: str) -> Dict[str, Any] | None:
     except Exception:
         return None
 
-def _norm(val, default=""):
-    return val if isinstance(val, str) and val else default
+def _norms(d: Dict[str, Any], k: str, default=""):
+    v = d.get(k)
+    return v if isinstance(v, str) and v else default
 
-def load_entries(wyniki_dir: str) -> List[Wpis]:
+def load_entries(wdir: str) -> List[Wpis]:
     entries: List[Wpis] = []
-
-    # 1) Priorytet: gotowe wiersze z raport_*.json (mają emoji)
-    for fp in sorted(glob.glob(os.path.join(wyniki_dir, "raport_*.json"))):
+    # Najpierw raport_*.json
+    for fp in sorted(glob.glob(os.path.join(wdir, "raport_*.json"))):
         d = _read_json(fp) or {}
-        reg = _norm(d.get("regulator"), "")
-        model = _norm(d.get("model"), "")
-        # część generatorów używa 'key': 'reg:model' – rozbij jeśli brak pól powyżej
+        reg = _norms(d, "regulator"); model = _norms(d, "model")
         if (not reg or not model) and isinstance(d.get("key"), str) and ":" in d["key"]:
             reg, model = d["key"].split(":", 1)
-        emoji = _norm(d.get("emoji"), "❌")
-        metrics = d.get("metrics") or {}
-        entries.append(Wpis(regulator=reg, model=model, emoji=emoji, metrics=metrics, src=os.path.basename(fp)))
-
-    # 2) Jeśli nie ma raportów, spróbuj z walidacja_*.json (zawierają PASS)
+        emoji = _norms(d, "emoji", "❌")
+        entries.append(Wpis(
+            regulator=reg or "-", model=model or "-", emoji=emoji,
+            metrics=d.get("metrics") or {}, plot=_norms(d, "plot", None),
+            src=os.path.basename(fp)
+        ))
     if not entries:
-        for fp in sorted(glob.glob(os.path.join(wyniki_dir, "walidacja_*.json"))):
+        for fp in sorted(glob.glob(os.path.join(wdir, "walidacja_*.json"))):
             d = _read_json(fp) or {}
-            reg = _norm(d.get("regulator"), "")
-            model = _norm(d.get("model"), "")
-            pass_cond = bool(d.get("PASS", False))
-            met = d.get("metryki") or {}
-            emoji = "✅" if pass_cond else "❌"
-            entries.append(Wpis(regulator=reg, model=model, emoji=emoji, metrics=met, src=os.path.basename(fp)))
-
+            emoji = "✅" if d.get("PASS") else "❌"
+            entries.append(Wpis(
+                regulator=_norms(d, "regulator") or "-", model=_norms(d, "model") or "-", emoji=emoji,
+                metrics=d.get("metryki") or {}, plot=_norms(d, "plot", None),
+                src=os.path.basename(fp)
+            ))
     return entries
 
-def render_html(entries: List[Wpis], out_fp: str) -> None:
-    rows = []
-    if not entries:
-        rows.append("<tr><td colspan='5'>Brak danych do oceny</td></tr>")
-    else:
-        for e in entries:
-            mp = e.metrics.get("Mp", e.metrics.get("przeregulowanie", ""))
-            ts = e.metrics.get("ts", e.metrics.get("czas_ustalania", ""))
-            iae = e.metrics.get("IAE", "")
-            rows.append(
-                f"<tr>"
-                f"<td>{e.emoji}</td>"
-                f"<td>{e.regulator or '-'}</td>"
-                f"<td>{e.model or '-'}</td>"
-                f"<td>{mp}</td>"
-                f"<td>{ts}</td>"
-                f"<td>{iae}</td>"
-                f"<td><code>{e.src}</code></td>"
-                f"</tr>"
-            )
-    html = f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8">
+def render_html(entries: List[Wpis], out_fp: str, base: str):
+    def row(e: Wpis) -> str:
+        mp = e.metrics.get("Mp", e.metrics.get("przeregulowanie", ""))
+        ts = e.metrics.get("ts", e.metrics.get("czas_ustalania", ""))
+        iae = e.metrics.get("IAE", "")
+        img = f"<a href='{e.plot}'><img src='{e.plot}' style='height:68px;border:1px solid #ddd;border-radius:6px'></a>" if (e.plot and os.path.exists(os.path.join(base, e.plot))) else "—"
+        return (
+            f"<tr class='{'ok' if e.emoji=='✅' else 'fail'}'>"
+            f"<td class='center'>{e.emoji}</td>"
+            f"<td>{e.regulator}</td>"
+            f"<td>{e.model}</td>"
+            f"<td class='num'>{mp}</td>"
+            f"<td class='num'>{ts}</td>"
+            f"<td class='num'>{iae}</td>"
+            f"<td>{img}</td>"
+            f"<td><code>{e.src}</code></td>"
+            f"</tr>"
+        )
+
+    rows = "\n".join(row(e) for e in entries) if entries else "<tr><td colspan='8'>Brak danych</td></tr>"
+    html = f"""<!doctype html><html><head><meta charset="utf-8">
 <title>Raport walidacji</title>
 <style>
-table{{border-collapse:collapse}} td,th{{border:1px solid #ccc;padding:6px 10px}}
-th{{background:#f6f6f6}}
+body{{font-family:Inter,Segoe UI,Arial,sans-serif;margin:24px}}
+h2{{margin:0 0 12px 0}}
+.badge{{display:inline-block;background:#eef;border:1px solid #ccd;padding:4px 8px;border-radius:6px;margin-right:8px}}
+table{{border-collapse:collapse;width:100%}}
+th,td{{border:1px solid #e3e3e3;padding:8px}}
+th{{background:#fafafa}}
+tr.ok{{background:#f6fff6}}
+tr.fail{{background:#fff6f6}}
+.num{{text-align:right}}
+.center{{text-align:center}}
+img{{display:block}}
+.small{{color:#666;font-size:12px}}
 </style>
 </head><body>
 <h2>Raport walidacji</h2>
+<div class="small">Wygenerowano automatycznie – miniatury linkują do pełnych PNG.</div>
 <table>
-<thead><tr><th>Wynik</th><th>Regulator</th><th>Model</th><th>Mp [%]</th><th>ts [s]</th><th>IAE</th><th>Plik</th></tr></thead>
+<thead><tr><th>Wynik</th><th>Regulator</th><th>Model</th><th>Mp [%]</th><th>ts [s]</th><th>IAE</th><th>Wykres</th><th>Plik</th></tr></thead>
 <tbody>
-{''.join(rows)}
+{rows}
 </tbody>
 </table>
 </body></html>"""
@@ -90,10 +99,10 @@ th{{background:#f6f6f6}}
         f.write(html)
 
 def main():
-    wyniki_dir = sys.argv[1] if len(sys.argv) > 1 else "wyniki"
-    os.makedirs(wyniki_dir, exist_ok=True)
-    entries = load_entries(wyniki_dir)
-    render_html(entries, os.path.join(wyniki_dir, "raport.html"))
+    wdir = sys.argv[1] if len(sys.argv) > 1 else "wyniki"
+    os.makedirs(wdir, exist_ok=True)
+    entries = load_entries(wdir)
+    render_html(entries, os.path.join(wdir, "raport.html"), wdir)
 
 if __name__ == "__main__":
     main()

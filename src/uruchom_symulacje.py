@@ -1,9 +1,8 @@
 # src/uruchom_symulacje.py
 from __future__ import annotations
 import os, json, time, glob
-from typing import Tuple, Dict, Any
+from typing import Dict, Any, Tuple
 
-# --- importy projektu ---
 from src.strojenie.wykonaj_strojenie import wykonaj_strojenie
 from src.metryki import oblicz_metryki
 
@@ -16,8 +15,11 @@ from src.regulatory.regulator_pi import Regulator_PI as RegPI
 from src.regulatory.regulator_pd import Regulator_PD as RegPD
 from src.regulatory.regulator_pid import Regulator_PID as RegPID
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
-# ---------- helpers ----------
+
 def now_stamp() -> str:
     return time.strftime("%Y%m%d-%H%M%S")
 
@@ -26,7 +28,7 @@ def wyniki_dir() -> str:
     os.makedirs(d, exist_ok=True)
     return d
 
-def pick_model(model_key: str, dt_env: str | None) -> Any:
+def pick_model(model_key: str, dt_env: str | None):
     dt = float(dt_env) if dt_env else None
     if model_key == "zbiornik_1rz":
         m = Zbiornik_1rz()
@@ -38,28 +40,22 @@ def pick_model(model_key: str, dt_env: str | None) -> Any:
         m.dt = float(dt)
     return m
 
-def make_reg(reg_key: str, params: Dict[str, float], model_dt: float) -> Any:
-    # domyślne ograniczenia sterowania
+def make_reg(reg_key: str, params: Dict[str, float], model_dt: float):
     umin, umax = 0.0, 1.0
-
     if reg_key == "regulator_p":
-        Kp = params.get("Kp") or params.get("kp") or params.get("KP") or 1.0
+        Kp = params.get("Kp") or params.get("kp") or 1.0
         Kr = params.get("Kr", 1.0)
         return RegP(Kp=Kp, Kr=Kr, dt=model_dt, umin=umin, umax=umax)
-
     if reg_key == "regulator_pi":
         kp = params.get("Kp", params.get("kp", 1.0))
         ti = params.get("Ti", params.get("ti", 10.0))
         tt = params.get("Tt", params.get("tt", max(ti/2, 1.0)))
         return RegPI(kp=kp, ti=ti, tt=tt, dt=model_dt, umin=umin, umax=umax)
-
     if reg_key == "regulator_pd":
         kp = params.get("Kp", params.get("kp", 1.0))
         td = params.get("Td", params.get("td", 1.0))
-        Kr = params.get("Kr", 1.0)  # dla Twoich modeli K≈1 → Kr=1
+        Kr = params.get("Kr", 1.0)
         return RegPD(kp=kp, td=td, Kr=Kr, dt=model_dt, umin=umin, umax=umax)
-
-    # PID
     kp = params.get("Kp", params.get("kp", 1.0))
     ti = params.get("Ti", params.get("ti", 10.0))
     td = params.get("Td", params.get("td", 1.0))
@@ -70,17 +66,36 @@ def make_reg(reg_key: str, params: Dict[str, float], model_dt: float) -> Any:
 def simulate(model, regulator, T: float = 120.0, r_value: float = 1.0):
     dt = float(getattr(model, "dt", 0.05))
     N = int(T / dt)
-    t = [0.0]
-    r = [r_value]
-    y = [float(getattr(model, "y", 0.0))]
-    u = [0.0]
+    t = [0.0]; r = [r_value]; y = [float(getattr(model, "y", 0.0))]; u = [0.0]
     for k in range(1, N):
         uk = regulator.update(r[-1], y[-1])
         yk = model.step(uk)
         t.append(k*dt); r.append(r_value); y.append(yk); u.append(uk)
     return oblicz_metryki(t, r, y, u), (t, r, y, u)
 
+def plot_run(path_png: str, title: str, t, r, y, u, m) -> None:
+    fig = plt.figure(figsize=(10, 7))
+    gs = fig.add_gridspec(2, 1, height_ratios=[2,1], hspace=0.25)
+    ax1 = fig.add_subplot(gs[0,0]); ax2 = fig.add_subplot(gs[1,0])
+
+    ax1.plot(t, r, "--", label="r", linewidth=2, alpha=0.7)
+    ax1.plot(t, y, label="y", linewidth=2)
+    ax1.set_title(title); ax1.set_xlabel("t [s]"); ax1.set_ylabel("Wartość"); ax1.grid(True, alpha=0.3); ax1.legend()
+
+    ax2.plot(t, u, label="u", linewidth=2)
+    ax2.set_xlabel("t [s]"); ax2.set_ylabel("Sterowanie"); ax2.grid(True, alpha=0.3); ax2.legend()
+
+    txt = (f"IAE: {m.IAE:.2f}\nMp: {m.przeregulowanie:.1f}%\n"
+           f"ts: {m.czas_ustalania:.1f}s\ntr: {m.czas_narastania:.1f}s\nEu: {m.uchyb_ustalony:.3g}")
+    ax1.text(0.01, 0.02, txt, transform=ax1.transAxes,
+             bbox=dict(boxstyle="round", fc="white", ec="#aaa"), fontsize=9, va="bottom")
+
+    fig.tight_layout()
+    fig.savefig(path_png, dpi=130)
+    plt.close(fig)
+
 def find_latest_params(dirpath: str, reg: str, model: str) -> Dict[str, Any] | None:
+    import glob
     pat = os.path.join(dirpath, f"parametry_{reg}_{model}_*.json")
     files = sorted(glob.glob(pat))
     if not files:
@@ -95,23 +110,21 @@ def find_latest_params(dirpath: str, reg: str, model: str) -> Dict[str, Any] | N
     return data if isinstance(data, dict) else None
 
 
-# ---------- main modes ----------
+# ------------- modes -------------
 def run_tune(reg: str, model: str):
     out = wykonaj_strojenie(reg, metoda="grid", model=model) or {}
     best = out.get("best") or {}
     stamp = now_stamp()
     outdir = wyniki_dir()
 
-    # zapisz parametry
     with open(os.path.join(outdir, f"parametry_{reg}_{model}_{stamp}.json"), "w") as f:
         json.dump(best, f, indent=2)
 
-    # prosty raport HTML
     with open(os.path.join(outdir, f"raport_strojenie_{reg}_{model}_{stamp}.html"), "w") as f:
-        f.write(f"<html><body><h1>Strojenie {reg} / {model}</h1><pre>{json.dumps(best, indent=2)}</pre></body></html>")
+        f.write(f"<html><body><h1>Strojenie {reg} / {model}</h1>"
+                f"<pre>{json.dumps(best, indent=2)}</pre></body></html>")
 
-    # pieczatka png (pusty plik – zeby artifact zawsze mial cos graficznego)
-    open(os.path.join(outdir, f"strojenie_{reg}_{model}_{stamp}.png"), "wb").close()
+    # UWAGA: nie tworzymy żadnych PNG tutaj (żeby nie było pustych plików)
 
 def run_validate(reg: str, model_key: str, dt_env: str | None):
     outdir = wyniki_dir()
@@ -119,42 +132,44 @@ def run_validate(reg: str, model_key: str, dt_env: str | None):
     model = pick_model(model_key, dt_env)
     regulator = make_reg(reg, params, getattr(model, "dt", 0.05))
 
-    metryki, _ = simulate(model, regulator, T=120.0, r_value=1.0)
+    metryki, (t, r, y, u) = simulate(model, regulator, T=120.0, r_value=1.0)
 
-    # progi (przyklad – dopasuj do swoich wymagan)
+    # progi przykładowe
     pass_cond = (metryki.przeregulowanie <= 10.0) and (metryki.czas_ustalania <= 0.6 * 120.0)
 
     stamp = now_stamp()
+    # wykres z przebiegami (REALNY PNG)
+    png = os.path.join(outdir, f"wykres_{reg}_{model_key}_{stamp}.png")
+    plot_run(png, f"{reg} — {model_key}", t, r, y, u, metryki)
+
     wal_json = {
         "regulator": reg,
         "model": model_key,
         "parametry": params,
         "metryki": {
-            "IAE": metryki.IAE,
-            "ISE": metryki.ISE,
-            "ITAE": metryki.ITAE,
-            "Mp": metryki.przeregulowanie,
-            "ts": metryki.czas_ustalania,
-            "tr": metryki.czas_narastania,
-            "Eu": metryki.uchyb_ustalony,
+            "IAE": metryki.IAE, "ISE": metryki.ISE, "ITAE": metryki.ITAE,
+            "Mp": metryki.przeregulowanie, "ts": metryki.czas_ustalania,
+            "tr": metryki.czas_narastania, "Eu": metryki.uchyb_ustalony,
             "sat_pct": metryki.procent_czasu_w_saturacji,
         },
         "PASS": bool(pass_cond),
+        "plot": os.path.basename(png),
     }
     with open(os.path.join(outdir, f"walidacja_{reg}_{model_key}_{stamp}.json"), "w") as f:
         json.dump(wal_json, f, indent=2)
 
-    # raport_*.json – to konsumuje ocena_metod/summary
     raport = {
         "key": f"{reg}:{model_key}",
+        "regulator": reg,
+        "model": model_key,
         "emoji": "✅" if pass_cond else "❌",
         "summary": f"{reg} on {model_key}",
         "metrics": {"Mp": metryki.przeregulowanie, "ts": metryki.czas_ustalania, "IAE": metryki.IAE},
+        "plot": os.path.basename(png),
     }
     with open(os.path.join(outdir, f"raport_{reg}_{model_key}_{stamp}.json"), "w") as f:
         json.dump(raport, f, indent=2)
 
-    # jesli PASS – dopisz do listy wdrozen
     if pass_cond:
         with open(os.path.join(outdir, "passed_models.txt"), "a") as f:
             f.write(f"{model_key}\n")
@@ -163,10 +178,8 @@ def run_validate(reg: str, model_key: str, dt_env: str | None):
 if __name__ == "__main__":
     REG = os.environ.get("REGULATOR", "regulator_pid")
     TRYB = os.environ.get("TRYB", "strojenie")
-    MODEL = os.environ.get("MODEL", None) or (
-        "zbiornik_1rz" if REG in ("regulator_p", "regulator_pi") else "dwa_zbiorniki"
-    )
-    DT = os.environ.get("DT")  # np. dla wahadla
+    MODEL = os.environ.get("MODEL") or ("zbiornik_1rz" if REG in ("regulator_p","regulator_pi") else "dwa_zbiorniki")
+    DT = os.environ.get("DT")
 
     if TRYB == "walidacja":
         run_validate(REG, MODEL, DT)

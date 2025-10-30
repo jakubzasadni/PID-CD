@@ -54,7 +54,6 @@ jobs:
           if [ -z "$(ls -A wyniki || true)" ]; then
             echo '{}' > wyniki/parametry_PLACEHOLDER.json
             echo '<html><body><h1>No tuning output</h1></body></html>' > wyniki/raport_strojenie_PLACEHOLDER.html
-            echo 'placeholder' > wyniki/strojenie_PLACEHOLDER.png
           fi
           ls -la wyniki || true
 
@@ -231,9 +230,8 @@ jobs:
         run: |
           echo "Copying results..."
           mkdir -p wyniki
-          # (gdyby były podkatalogi – spłaszczenie)
-          find wyniki -type f -name "*.json" -not -path "wyniki/raport.json" -exec mv -f {} wyniki/ \; || true
-          find wyniki -type f -name "*.png"  -exec mv -f {} wyniki/ \; || true
+          find wyniki -type f -name "*.json" ! -name "*PLACEHOLDER*" -exec cp -f {} wyniki/ \; || true
+          find wyniki -type f -name "*.png"  ! -name "*PLACEHOLDER*" -size +0c -exec cp -f {} wyniki/ \; || true
           ls -R wyniki || true
 
       - name: Decide summary mode (data/no-data)
@@ -252,7 +250,7 @@ jobs:
         run: |
           docker run --rm \
             -v ${{ github.workspace }}/wyniki:/app/wyniki \
-            regulator-sim:test python src/ocena_metod.py wyniki || echo "⚠️ ocena_metod.py nie wygenerował raportu"
+            regulator-sim:test python src/ocena_metod.py wyniki
 
       - name: Fallback raport (brak danych)
         if: steps.decide.outputs.found_json == '0'
