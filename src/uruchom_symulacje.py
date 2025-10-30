@@ -2,6 +2,7 @@
 """
 Uruchamianie symulacji – wersja utwardzona:
 - autodetekcja modułów (model/regulator) gdy zadany nie istnieje,
+- wybór klasy Z TEGO pliku modułu (nie złapie bazowej z innego),
 - mapowanie parametrów (case-insensitive, kp<->Kp, itd.),
 - DT z ENV, jeśli konstruktor modelu przyjmuje 'dt',
 - generowanie artefaktów do GitHub Actions:
@@ -23,8 +24,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 try:
-    # Jeżeli wcześniej dodałeś ten plik – możemy użyć fallbacku ZN
-    from src.strojenie.ziegler_nichols import policz_zn  # optional
+    from src.strojenie.ziegler_nichols import policz_zn  # opcjonalnie (fallback strojenia)
 except Exception:
     policz_zn = None  # type: ignore
 
@@ -63,6 +63,12 @@ _SYNONIMY = {
 }
 
 def _dopasuj_kwargs_do_sygnatury(cls: type, params: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Dopasuj słownik `params` do sygnatury konstruktora `cls`:
+    - case-insensitive,
+    - mapowanie aliasów (kp->Kp itp.),
+    - odrzucenie kluczy nieobecnych w __init__.
+    """
     sig = inspect.signature(cls.__init__)
     akceptowane = {p.name for p in sig.parameters.values() if p.kind in (p.KEYWORD_ONLY, p.POSITIONAL_OR_KEYWORD)}
     akceptowane_low = {name.lower(): name for name in akceptowane}
@@ -70,14 +76,17 @@ def _dopasuj_kwargs_do_sygnatury(cls: type, params: Dict[str, Any]) -> Dict[str,
     wynik: Dict[str, Any] = {}
     for k, v in (params or {}).items():
         low = str(k).lower()
+        # 1) znane synonimy (kp->Kp)
         if low in _SYNONIMY:
             cel = _SYNONIMY[low]
             if cel in akceptowane:
                 wynik[cel] = v
                 continue
+        # 2) bezpośrednie dopasowanie (case-insensitive) do parametrów __init__
         if low in akceptowane_low:
             wynik[akceptowane_low[low]] = v
             continue
+        # brak dopasowania → ignorujemy
     return wynik
 
 
@@ -94,16 +103,19 @@ def _znormalizuj(nazwa: str) -> str:
     return nazwa.lower().replace("_", "").replace("-", "")
 
 def _wybierz_modul_z_fallbackiem(base_pkg: str, katalog: Path, zadany: str) -> Tuple[str, Any]:
+    # 1) próba bezpośrednia
     try:
         mod = dynamiczny_import(f"{base_pkg}.{zadany}", nazwa=None)
         return zadany, mod
     except Exception:
         pass
 
+    # 2) lista dostępnych
     dostepne = _listuj_moduly_w_katalogu(katalog)
     if not dostepne:
         raise ImportError(f"Brak modułów w katalogu '{katalog}'.")
 
+    # 3) fuzzy dopasowanie
     klucz = _znormalizuj(zadany)
     kandydaci: List[str] = []
     for n in dostepne:
@@ -209,11 +221,18 @@ def main() -> None:
     except Exception:
         wybrany_reg, regulator_mod = _wybierz_modul_z_fallbackiem("src.regulatory", REG_DIR, regulator_modul)
 
+    # Wybieramy KLASĘ ZDEFINIOWANĄ W TYM MODULE (nie bazową z innego pliku)
     RegClass = None
     for nazwa, ob in vars(regulator_mod).items():
-        if inspect.isclass(ob) and nazwa.lower().startswith("regulator"):
+        if inspect.isclass(ob) and ob.__module__ == regulator_mod.__name__ and nazwa.lower().startswith("regulator"):
             RegClass = ob
             break
+    if RegClass is None:
+        # awaryjnie: stara heurystyka
+        for nazwa, ob in vars(regulator_mod).items():
+            if inspect.isclass(ob) and nazwa.lower().startswith("regulator"):
+                RegClass = ob
+                break
     if RegClass is None:
         raise ImportError(f"Nie znaleziono klasy regulatora w module 'src.regulatory.{wybrany_reg}'.")
 
@@ -223,17 +242,24 @@ def main() -> None:
     except Exception:
         wybrany_model, model_mod = _wybierz_modul_z_fallbackiem("src.modele", MODELE_DIR, model_modul)
 
+    # Analogicznie: klasa zdefiniowana W TYM PLIKU modułu modelu
     ModelClass = None
     for nazwa, ob in vars(model_mod).items():
-        if inspect.isclass(ob):
+        if inspect.isclass(ob) and ob.__module__ == model_mod.__name__:
             ModelClass = ob
             break
+    if ModelClass is None:
+        # awaryjnie: pierwsza napotkana klasa
+        for nazwa, ob in vars(model_mod).items():
+            if inspect.isclass(ob):
+                ModelClass = ob
+                break
     if ModelClass is None:
         raise ImportError(f"Nie znaleziono klasy modelu w module 'src.modele.{wybrany_model}'.")
 
     # --- Parametry z konfiguracji ---
-    paramy_reg = konfiguracja.get("regulator", {})
-    paramy_mod = konfiguracja.get("model", {})
+    paramy_reg_cfg = konfiguracja.get("regulator", {})
+    paramy_mod_cfg = konfiguracja.get("model", {})
 
     # DT z ENV (jeśli konstruktor modelu przyjmuje 'dt')
     dt_env = os.getenv("DT")
@@ -243,18 +269,20 @@ def main() -> None:
             sig_m = inspect.signature(ModelClass.__init__)
             names = {p.name.lower() for p in sig_m.parameters.values()}
             if "dt" in names:
-                paramy_mod = dict(paramy_mod)
-                paramy_mod["dt"] = dt_val
+                paramy_mod_cfg = dict(paramy_mod_cfg)
+                paramy_mod_cfg["dt"] = dt_val
         except ValueError:
             print(f"[WARN] DT='{dt_env}' nie jest liczbą – ignoruję.", file=sys.stderr)
 
     # --- Utworzenie instancji modelu i regulatora z mapowaniem kluczy ---
-    paramy_mod_mapped = _dopasuj_kwargs_do_sygnatury(ModelClass, paramy_mod)
+    paramy_mod_mapped = _dopasuj_kwargs_do_sygnatury(ModelClass, paramy_mod_cfg)
 
-    # Fallback strojenia: jeśli nie podano parametrów regulatora, spróbuj ZN
-    paramy_reg_mapped = _dopasuj_kwargs_do_sygnatury(RegClass, paramy_reg)
+    # Najpierw zmapuj to, co przyszło z configu
+    paramy_reg_mapped = _dopasuj_kwargs_do_sygnatury(RegClass, paramy_reg_cfg)
+
+    # Jeśli nadal pusto – zastosuj fallback (ZN lub bezpieczne domyślne),
+    # a POTEM PONOWNIE ZMAPUJ pod sygnaturę konstruktora.
     if not paramy_reg_mapped:
-        # wyciągnij typ regulatora z nazwy modułu
         typ = "PID"
         mlow = wybrany_reg.lower()
         if "regulator_p" in mlow and "pid" not in mlow and "pi" not in mlow and "pd" not in mlow:
@@ -262,22 +290,26 @@ def main() -> None:
         elif "regulator_pi" in mlow:
             typ = "PI"
         elif "regulator_pd" in mlow:
-            typ = "PD"  # ZN nie ma klasycznego PD; zostawimy tylko Kp i Td jeśli istnieją
+            typ = "PD"
         elif "regulator_pid" in mlow:
             typ = "PID"
 
+        fallback_params: Dict[str, Any] = {}
         if policz_zn is not None and typ in ("P", "PI", "PID"):
-            # Minimalny fallback – klasyczne ZN z konserwatywnymi Ku/Tu (placeholder)
-            zn = policz_zn(typ, Ku=2.0, Tu=25.0)
-            paramy_reg_mapped.update(zn)
+            fallback_params = policz_zn(typ, Ku=2.0, Tu=25.0)  # placeholder Ku/Tu
         else:
-            # Ostrożne domyślne
-            if "Kp" in inspect.signature(RegClass.__init__).parameters:
-                paramy_reg_mapped["Kp"] = 1.0
-            if "Ti" in inspect.signature(RegClass.__init__).parameters:
-                paramy_reg_mapped.setdefault("Ti", 1.0)
-            if "Td" in inspect.signature(RegClass.__init__).parameters:
-                paramy_reg_mapped.setdefault("Td", 0.0)
+            # ostrożne domyślne
+            sig_r = inspect.signature(RegClass.__init__)
+            rp = sig_r.parameters
+            if "Kp" in rp or "kp" in rp:
+                fallback_params["Kp"] = 1.0
+            if "Ti" in rp or "ti" in rp:
+                fallback_params.setdefault("Ti", 1.0)
+            if "Td" in rp or "td" in rp:
+                fallback_params.setdefault("Td", 0.0)
+
+        # KLUCZOWE: ponownie mapujemy fallback na sygnaturę konstruktora (Kp→kp itd.)
+        paramy_reg_mapped = _dopasuj_kwargs_do_sygnatury(RegClass, fallback_params)
 
     model = ModelClass(**paramy_mod_mapped)
     regulator = RegClass(**paramy_reg_mapped)
@@ -291,7 +323,6 @@ def main() -> None:
 
     # ------------------------------------------
     # (A) TU możesz wkleić swoją właściwą symulację
-    #     i wygenerować 't', 'y', 'u' z modelu.
     # ------------------------------------------
     # Placeholder: prosta odpowiedź 1-rz. na skok (żeby były artefakty)
     t_end = 10.0
@@ -301,7 +332,7 @@ def main() -> None:
     tau = 2.0
     y = 1.0 - np.exp(-t / tau)
 
-    # --- Zapis artefaktów (nazwy zgodne z Twoim patternem) ---
+    # --- Zapis artefaktów (nazwy zgodne z patternem uploadu) ---
     base = f"{_slug(wybrany_reg)}__{_slug(wybrany_model)}"
     param_path = _zapisz_parametry_json(wyjscie_dir, base, wybrany_reg, wybrany_model,
                                         paramy_reg_mapped, paramy_mod_mapped)
