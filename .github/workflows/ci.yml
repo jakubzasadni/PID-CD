@@ -247,13 +247,12 @@ jobs:
           done
           echo "found_json=$COUNT" >> $GITHUB_OUTPUT
 
-      - name: Generuj raport zbiorczy (jeśli są dane)
+      - name: Generuj raport zbiorczy
         if: steps.decide.outputs.found_json != '0'
         run: |
           docker run --rm \
-            -e REGULATOR=${{ github.event.inputs.regulator }} \
             -v ${{ github.workspace }}/wyniki:/app/wyniki \
-            regulator-sim:test python src/ocena_metod.py || echo "⚠️ ocena_metod.py nie wygenerował raportu"
+            regulator-sim:test python src/ocena_metod.py wyniki || echo "⚠️ ocena_metod.py nie wygenerował raportu"
 
       - name: Fallback raport (brak danych)
         if: steps.decide.outputs.found_json == '0'
