@@ -1,33 +1,58 @@
-# src/regulatory/regulator_pid.py
+from typing import Optional
+import math
+
 from src.regulatory.regulator_bazowy import RegulatorBazowy
 
-class Regulator_PID(RegulatorBazowy):
+
+class RegulatorPID(RegulatorBazowy):
+    """Klasyczny PID z kilkoma poprawkami: walidacja, reset, anti-windup.
+
+    Params kept similar to original implementation for backward compatibility.
     """
-    Klasyczny regulator PID z prostym antywindupem.
-    """
-    def __init__(self, kp=1.0, ti=30.0, td=0.0, n=10.0, umin=0.0, umax=1.0, kaw=1.0, dt=0.05):
-        super().__init__(dt)
-        self.kp = kp
-        self.ti = ti
-        self.td = td
-        self.n = n
-        self.umin = umin
-        self.umax = umax
-        self.kaw = kaw
+    def __init__(self, kp: float = 1.0, ti: float = 30.0, td: float = 0.0,
+                 n: float = 10.0, umin: Optional[float] = None, umax: Optional[float] = None,
+                 kaw: float = 0.1, dt: float = 0.05):
+        super().__init__(dt=dt, umin=umin, umax=umax)
+        self.kp = float(kp)
+        self.ti = max(1e-6, float(ti))
+        self.td = max(0.0, float(td))
+        self.n = max(1.0, float(n))
+        self.kaw = float(kaw)
+
+        # stany
         self.ui = 0.0
         self.ud = 0.0
-        self.prev_y = 0.0
+        self.prev_y = None
+        self._filter_alpha = 0.0 if self.td == 0.0 else (self.dt * self.n) / (self.td + self.dt * self.n)
+        self.validate_params()
 
-    def update(self, r, y):
+    def reset(self) -> None:
+        super().reset()
+        self.ui = 0.0
+        self.ud = 0.0
+        self.prev_y = None
+
+    def update(self, r: float, y: float) -> float:
         e = r - y
-        # Część całkująca
+        # Integrator
         self.ui += (self.kp / self.ti) * e * self.dt
-        # Część różniczkująca
-        self.ud = self.td / (self.td + self.n * self.dt) * self.ud + (self.kp * self.td * self.n) / (self.td + self.n * self.dt) * (y - self.prev_y)
-        # Sygnał sterujący
+
+        # Derivative (filterowany)
+        if self.prev_y is None or self.td == 0.0:
+            dy = 0.0
+        else:
+            dy = y - self.prev_y
+        raw_d = (self.kp * self.td * self.n) / (self.td + self.n * self.dt) * dy
+        # IIR-like update consistent with prior implementation
+        self.ud = (self.td / (self.td + self.n * self.dt)) * self.ud + raw_d
+
         u_unsat = self.kp * e + self.ui - self.ud
-        u_sat = max(self.umin, min(self.umax, u_unsat))
-        # Antywindup
+        u_sat = self._saturate(u_unsat)
+
+        # Anti-windup (back-calculation)
         self.ui += self.kaw * (u_sat - u_unsat)
+
         self.prev_y = y
+        self.u_prev = self.u
+        self.u = u_sat
         return u_sat
