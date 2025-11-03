@@ -1,0 +1,9 @@
+{
+  "regulator": "regulator_p",
+  "metoda": "optymalizacja",
+  "parametry": {
+    "Kp": 2.0,
+    "Ti": null,
+    "Td": null
+  }
+}

@@ -3,7 +3,7 @@ from src.regulatory.regulator_bazowy import RegulatorBazowy
 
 class regulator_pd(RegulatorBazowy):
     """
-    Ulepszony regulator PD:
+    Regulator PD (proporcjonalno-różniczkujący):
     - Proporcjonalne na ważone zadanie: u_P = Kp * (b*r - y)
     - Różniczkujące na pomiar (bez "derivative kick"), filtrowane (współczynnik N):
         v_d[k] = a * v_d[k-1] - beta * (y[k] - y[k-1])
@@ -12,25 +12,31 @@ class regulator_pd(RegulatorBazowy):
     - Feedforward Kr*r dla eliminacji offsetu stałego (domyślnie Kr=1.0)
 
     Parametry:
-    - Kp: wzmocnienie proporcjonalne
-    - Td: stała różniczkowania (s)
-    - N:  współczynnik filtra (domyślnie 10.0)
+    - Kp: wzmocnienie proporcjonalne (domyślnie 1.0)
+    - Ti: nieużywane w PD (dla kompatybilności z PI/PID, domyślnie None)
+    - Td: stała różniczkowania w sekundach (domyślnie 0.0)
+    - N:  współczynnik filtra pochodnej (domyślnie 10.0)
     - b:  waga wartości zadanej w członie P (domyślnie 1.0)
-    - Kr: wzmocnienie feedforward (domyślnie 1.0) — dodaje u_ff = Kr*r do sygnału sterującego,
-          aby wyrównać offset; dla idealnego modelu Kr ≈ 1/K_proc
-    - dt, umin, umax: z klasy bazowej
+    - Kr: wzmocnienie feedforward (domyślnie 1.0) — kompensuje offset
+    - dt: krok próbkowania (domyślnie 0.05)
+    - umin, umax: ograniczenia sygnału (domyślnie None)
+    
+    Nieużywane w PD (dla kompatybilności z PI/PID):
+    - Ti, Tt (ignorowane)
     """
 
     def __init__(
         self,
         Kp: float = 1.0,
+        Ti: float | None = None,
         Td: float = 0.0,
-        Kr: float = 1.0,
         dt: float = 0.05,
         umin=None,
         umax=None,
-        N: float = 10.0,
         b: float = 1.0,
+        Kr: float = 1.0,
+        N: float = 10.0,
+        Tt: float | None = None,
     ):
         super().__init__(dt=dt, umin=umin, umax=umax)
         self.Kp = float(Kp)
@@ -38,6 +44,10 @@ class regulator_pd(RegulatorBazowy):
         self.N = float(N)
         self.b = float(b)
         self.Kr = float(Kr)
+        
+        # Dla kompatybilności (nieużywane w PD)
+        self.Ti = Ti
+        self.Tt = Tt
 
         # Stany wewnętrzne filtra D
         self._vd = 0.0

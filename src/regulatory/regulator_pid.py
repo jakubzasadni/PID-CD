@@ -1,33 +1,111 @@
 # src/regulatory/regulator_pid.py
 from src.regulatory.regulator_bazowy import RegulatorBazowy
 
+
 class Regulator_PID(RegulatorBazowy):
     """
-    Klasyczny regulator PID z prostym antywindupem.
-    """
-    def __init__(self, kp=1.0, ti=30.0, td=0.0, n=10.0, umin=0.0, umax=1.0, kaw=1.0, dt=0.05):
-        super().__init__(dt)
-        self.kp = kp
-        self.ti = ti
-        self.td = td
-        self.n = n
-        self.umin = umin
-        self.umax = umax
-        self.kaw = kaw
-        self.ui = 0.0
-        self.ud = 0.0
-        self.prev_y = 0.0
+    Regulator PID (proporcjonalno-całkująco-różniczkujący):
+    - Proporcjonalne na ważone zadanie: u_P = Kp * (b*r - y)
+    - Całkowanie błędu z anti-windup (back-calculation, współczynnik Tt)
+    - Różniczkujące na pomiar (filtrowane, współczynnik N)
+    - Opcjonalny feedforward Kr*r (domyślnie Kr=0.0, bo I eliminuje offset)
 
-    def update(self, r, y):
+    Parametry:
+    - Kp: wzmocnienie proporcjonalne (domyślnie 1.0)
+    - Ti: stała całkowania w sekundach (domyślnie 30.0)
+    - Td: stała różniczkowania w sekundach (domyślnie 0.0)
+    - N:  współczynnik filtra pochodnej (domyślnie 10.0)
+    - Tt: stała anti-windup (domyślnie Tt=Ti, back-calculation 1:1)
+    - b:  waga wartości zadanej w członie P (domyślnie 1.0)
+    - Kr: wzmocnienie feedforward (domyślnie 0.0) — rzadko potrzebne w PID
+    - dt: krok próbkowania (domyślnie 0.05)
+    - umin, umax: ograniczenia sygnału (domyślnie 0.0, 1.0)
+    """
+
+    def __init__(
+        self,
+        Kp: float = 1.0,
+        Ti: float = 30.0,
+        Td: float = 0.0,
+        dt: float = 0.05,
+        umin: float = 0.0,
+        umax: float = 1.0,
+        b: float = 1.0,
+        Kr: float = 0.0,
+        N: float = 10.0,
+        Tt: float | None = None,
+    ):
+        super().__init__(dt=dt, umin=umin, umax=umax)
+        self.Kp = float(Kp)
+        self.Ti = float(Ti)
+        self.Td = float(Td)
+        self.N = float(N)
+        self.b = float(b)
+        self.Kr = float(Kr)
+        
+        # Anti-windup: Tt domyślnie = Ti
+        self.Tt = float(Tt) if Tt is not None else self.Ti
+
+        # Aliasy dla starego API
+        self.kp = self.Kp
+        self.ti = self.Ti
+        self.td = self.Td
+        self.n = self.N
+        self.kaw = 1.0  # stary parametr, teraz używamy Tt
+
+        # Stany wewnętrzne
+        self._ui = 0.0
+        self._vd = 0.0
+        self._y_prev = None
+
+        # Walidacja
+        if self.Ti <= 0:
+            raise ValueError("Ti musi być > 0")
+        if self.Td < 0:
+            raise ValueError("Td musi być >= 0")
+        if self.N <= 0:
+            raise ValueError("N musi być > 0")
+        if self.Tt <= 0:
+            raise ValueError("Tt musi być > 0")
+
+    def reset(self):
+        super().reset()
+        self._ui = 0.0
+        self._vd = 0.0
+        self._y_prev = None
+
+    def update(self, r: float, y: float) -> float:
+        # Inicjalizacja poprzedniego pomiaru
+        if self._y_prev is None:
+            self._y_prev = float(y)
+
+        # Część proporcjonalna (waga b)
+        e_w = self.b * r - y
+        u_p = self.Kp * e_w
+
+        # Błąd pełny (dla całkowania)
         e = r - y
-        # Część całkująca
-        self.ui += (self.kp / self.ti) * e * self.dt
-        # Część różniczkująca
-        self.ud = self.td / (self.td + self.n * self.dt) * self.ud + (self.kp * self.td * self.n) / (self.td + self.n * self.dt) * (y - self.prev_y)
-        # Sygnał sterujący
-        u_unsat = self.kp * e + self.ui - self.ud
-        u_sat = max(self.umin, min(self.umax, u_unsat))
-        # Antywindup
-        self.ui += self.kaw * (u_sat - u_unsat)
-        self.prev_y = y
-        return u_sat
+
+        # Część różniczkująca na pomiar (filtrowana)
+        if self.Td > 0.0:
+            a = self.Td / (self.Td + self.N * self.dt)
+            beta = (self.Kp * self.Td * self.N) / (self.Td + self.N * self.dt)
+            dy = y - self._y_prev
+            self._vd = a * self._vd - beta * dy
+        else:
+            self._vd = 0.0
+
+        self._y_prev = float(y)
+
+        # Sygnał przed saturacją
+        u_raw = u_p + self._ui + self._vd + self.Kr * r
+
+        # Saturacja
+        u = self._saturate(u_raw)
+
+        # Anti-windup: back-calculation
+        e_sat = u - u_raw
+        self._ui += (self.Kp / self.Ti) * e * self.dt + (1.0 / self.Tt) * e_sat * self.dt
+
+        self.u = u
+        return u

@@ -4,41 +4,53 @@ from src.regulatory.regulator_bazowy import RegulatorBazowy
 
 class Regulator_PI(RegulatorBazowy):
     """
-    Ulepszony regulator PI:
+    Regulator PI (proporcjonalno-całkujący):
     - Proporcjonalne na ważone zadanie: u_P = Kp * (b*r - y)
     - Całkowanie błędu z anti-windup (back-calculation, współczynnik Tt)
     - Opcjonalny feedforward Kr*r dla szybszej reakcji (domyślnie Kr=0.0, bo I eliminuje offset)
 
     Parametry:
-    - Kp (kp): wzmocnienie proporcjonalne
-    - Ti (ti): stała całkowania (s)
-    - Tt: stała anti-windup (domyślnie Tt = Ti, czyli back-calculation 1:1)
+    - Kp: wzmocnienie proporcjonalne (domyślnie 1.0)
+    - Ti: stała całkowania w sekundach (domyślnie 30.0)
+    - Tt: stała anti-windup (domyślnie Tt=Ti, back-calculation 1:1)
     - b:  waga wartości zadanej w członie P (domyślnie 1.0)
-    - Kr: wzmocnienie feedforward (domyślnie 0.0) — dla PI rzadko potrzebne, bo I eliminuje offset
-    - dt, umin, umax: z klasy bazowej
+    - Kr: wzmocnienie feedforward (domyślnie 0.0) — rzadko potrzebne w PI
+    - dt: krok próbkowania (domyślnie 0.05)
+    - umin, umax: ograniczenia sygnału (domyślnie 0.0, 1.0)
+    
+    Nieużywane w PI (dla kompatybilności z PD/PID):
+    - Td, N (ignorowane)
     """
 
     def __init__(
         self,
-        kp: float = 1.0,
-        ti: float = 30.0,
+        Kp: float = 1.0,
+        Ti: float = 30.0,
+        Td: float | None = None,
+        dt: float = 0.05,
         umin: float = 0.0,
         umax: float = 1.0,
-        dt: float = 0.05,
-        Tt: float | None = None,
         b: float = 1.0,
         Kr: float = 0.0,
+        N: float | None = None,
+        Tt: float | None = None,
     ):
         super().__init__(dt=dt, umin=umin, umax=umax)
-        self.Kp = float(kp)  # alias dla kompatybilności
-        self.kp = self.Kp
-        self.Ti = float(ti)
-        self.ti = self.Ti
+        self.Kp = float(Kp)
+        self.Ti = float(Ti)
         self.b = float(b)
         self.Kr = float(Kr)
         
         # Anti-windup: Tt domyślnie = Ti (standardowa back-calculation)
         self.Tt = float(Tt) if Tt is not None else self.Ti
+        
+        # Dla kompatybilności (nieużywane w PI)
+        self.Td = Td
+        self.N = N
+
+        # Aliasy dla starego API
+        self.kp = self.Kp
+        self.ti = self.Ti
 
         # Stan wewnętrzny
         self._ui = 0.0  # suma całkująca
