@@ -6,12 +6,13 @@ class Metryki:
     IAE: float
     ISE: float
     ITAE: float
-    przeregulowanie: float      # [%] – zawsze liczba (dla r≈0 ustawiamy 0.0)
-    czas_ustalania: float       # [s]
-    czas_narastania: float      # [s] – dla r≈0: czas zaniku 90%→10%
+    przeregulowanie: float  # [%]
+    czas_ustalania: float   # [s]
+    czas_narastania: float  # [s]
     energia_sterowania: float
 
 def _first_crossing_time(t, y, level, rising=True):
+    """Liniowa interpolacja czasu pierwszego przekroczenia 'level'."""
     for i in range(1, len(t)):
         if rising and (y[i-1] < level <= y[i]):
             a, b = y[i-1], y[i]
@@ -38,19 +39,20 @@ def oblicz_metryki(t, r, y, u=None, settle_band=0.02, hold_time=0.0):
     energia_sterowania = np.trapz(u**2, t)
 
     steady_state = r[-1]
-    step_amp = abs(r[-1] - r[0])                    # amplituda skoku zadania
-    resp_amp = np.max(np.abs(y - steady_state))     # maks. odchyłka odpowiedzi
+    y0 = y[0]
 
-    # --- Przeregulowanie [%] ---
-    if step_amp > 1e-9:
-        step_dir = np.sign(r[-1] - r[0]) or 1.0
-        peak_dev = np.max(step_dir * (y - steady_state))
-        przeregulowanie = max(0.0, 100.0 * peak_dev / step_amp)
-    else:
-        przeregulowanie = 0.0   # zdefiniowane jako 0 przy braku skoku
+    # --- amplituda i kierunek skoku ---
+    step_amp_r = abs(r[-1] - r[0])                    # amplituda skoku zadania
+    step_amp_y = abs(steady_state - y0)               # amplituda odpowiedzi
+    step_amp = max(step_amp_r, step_amp_y)            # <= KLUCZOWE
+    step_dir = np.sign(steady_state - y0) or 1.0
+
+    # --- przeregulowanie [%] ---
+    peak_dev = np.max(step_dir * (y - steady_state))  # dodatnie tylko powyżej stanu ustalonego
+    przeregulowanie = max(0.0, 100.0 * peak_dev / (step_amp if step_amp > 1e-12 else 1.0))
 
     # --- Czas ustalania [s] ---
-    band_ref = step_amp if step_amp > 1e-9 else resp_amp
+    band_ref = step_amp if step_amp > 1e-9 else np.max(np.abs(y - steady_state))
     tol = settle_band * (band_ref if band_ref > 1e-12 else 1.0)
 
     within = np.abs(y - steady_state) <= tol
@@ -71,9 +73,9 @@ def oblicz_metryki(t, r, y, u=None, settle_band=0.02, hold_time=0.0):
 
     # --- Czas narastania [s] ---
     if step_amp > 1e-9:
-        y10 = r[0] + 0.10 * (r[-1] - r[0])
-        y90 = r[0] + 0.90 * (r[-1] - r[0])
-        rising = (r[-1] > r[0])
+        y10 = y0 + 0.10 * (steady_state - y0)
+        y90 = y0 + 0.90 * (steady_state - y0)
+        rising = (steady_state > y0)
         t10 = _first_crossing_time(t, y, y10, rising=rising)
         t90 = _first_crossing_time(t, y, y90, rising=rising)
         if t10 is not None and t90 is not None and t90 >= t10:
