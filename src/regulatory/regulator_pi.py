@@ -11,7 +11,7 @@ class Regulator_PI(RegulatorBazowy):
 
     Parametry:
     - Kp: wzmocnienie proporcjonalne (domyślnie 1.0)
-    - Ti: stała całkowania w sekundach (domyślnie 30.0)
+    - Ti: stała całkowania w sekundach (domyślnie 10.0)
     - Tt: stała anti-windup (domyślnie Tt=Ti, back-calculation 1:1)
     - b:  waga wartości zadanej w członie P (domyślnie 1.0)
     - Kr: wzmocnienie feedforward (domyślnie 1.0) — zapewnia szybki start
@@ -25,7 +25,7 @@ class Regulator_PI(RegulatorBazowy):
     def __init__(
         self,
         Kp: float = 1.0,
-        Ti: float = 30.0,
+        Ti: float = 10.0,
         Td: float | None = None,
         dt: float = 0.05,
         umin: float = 0.0,

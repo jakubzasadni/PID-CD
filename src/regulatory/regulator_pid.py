@@ -12,7 +12,7 @@ class Regulator_PID(RegulatorBazowy):
 
     Parametry:
     - Kp: wzmocnienie proporcjonalne (domyślnie 1.0)
-    - Ti: stała całkowania w sekundach (domyślnie 30.0)
+    - Ti: stała całkowania w sekundach (domyślnie 10.0)
     - Td: stała różniczkowania w sekundach (domyślnie 0.0)
     - N:  współczynnik filtra pochodnej (domyślnie 10.0)
     - Tt: stała anti-windup (domyślnie Tt=Ti, back-calculation 1:1)
@@ -25,7 +25,7 @@ class Regulator_PID(RegulatorBazowy):
     def __init__(
         self,
         Kp: float = 1.0,
-        Ti: float = 30.0,
+        Ti: float = 10.0,
         Td: float = 0.0,
         dt: float = 0.05,
         umin: float = 0.0,
