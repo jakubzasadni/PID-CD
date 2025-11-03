@@ -1,0 +1,9 @@
+{
+  "regulator": "regulator_pi",
+  "metoda": "siatka",
+  "parametry": {
+    "Kp": 1.92,
+    "Ti": 29.66,
+    "Td": null
+  }
+}
