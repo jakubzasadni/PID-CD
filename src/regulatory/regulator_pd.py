@@ -9,13 +9,15 @@ class regulator_pd(RegulatorBazowy):
         v_d[k] = a * v_d[k-1] - beta * (y[k] - y[k-1])
         a    = Td / (Td + N*dt)
         beta = Kp * Td * N / (Td + N*dt)
+    - Feedforward Kr*r dla eliminacji offsetu stałego (domyślnie Kr=1.0)
 
     Parametry:
     - Kp: wzmocnienie proporcjonalne
     - Td: stała różniczkowania (s)
     - N:  współczynnik filtra (domyślnie 10.0)
     - b:  waga wartości zadanej w członie P (domyślnie 1.0)
-    - Kr: zachowany dla kompatybilności (nie używany w sterowaniu, aby uniknąć przesterowań)
+    - Kr: wzmocnienie feedforward (domyślnie 1.0) — dodaje u_ff = Kr*r do sygnału sterującego,
+          aby wyrównać offset; dla idealnego modelu Kr ≈ 1/K_proc
     - dt, umin, umax: z klasy bazowej
     """
 
@@ -35,7 +37,6 @@ class regulator_pd(RegulatorBazowy):
         self.Td = float(Td)
         self.N = float(N)
         self.b = float(b)
-        # Zachowane dla kompatybilności (nie używane w równaniu sterowania)
         self.Kr = float(Kr)
 
         # Stany wewnętrzne filtra D
@@ -75,7 +76,10 @@ class regulator_pd(RegulatorBazowy):
 
         self._y_prev = float(y)
 
-        u = u_p + self._vd
+        # Feedforward Kr*r eliminuje offset stały (PD bez I ma zawsze uchyb)
+        u_ff = self.Kr * r
+
+        u = u_p + self._vd + u_ff
         u = self._saturate(u)
         self.u = u
         return u
