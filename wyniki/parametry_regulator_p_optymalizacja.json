@@ -2,7 +2,7 @@
   "regulator": "regulator_p",
   "metoda": "optymalizacja",
   "parametry": {
-    "Kp": 2.0,
+    "Kp": 15.0,
     "Ti": null,
     "Td": null
   }

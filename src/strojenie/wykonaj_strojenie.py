@@ -6,13 +6,97 @@ Obsługiwane regulatory: regulator_p, regulator_pi, regulator_pd, regulator_pid.
 
 import os
 import json
+import importlib
 import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
 
-from src.strojenie.ziegler_nichols import strojenie_PID
-from src.strojenie.przeszukiwanie_siatki import przeszukiwanie_siatki
-from src.strojenie.optymalizacja_numeryczna import optymalizuj_podstawowy
+from src.metryki import oblicz_metryki
+
+
+# ------------------------------------------------------------
+# Funkcja pomocnicza - dynamiczny import
+# ------------------------------------------------------------
+def _dynamiczny_import(typ: str, nazwa: str):
+    """Dynamicznie importuje klasę modelu lub regulatora."""
+    modul = importlib.import_module(f"src.{typ}.{nazwa}")
+    for attr in dir(modul):
+        if attr.lower() == nazwa.lower():
+            return getattr(modul, attr)
+    return getattr(modul, [a for a in dir(modul) if not a.startswith("_")][0])
+
+
+# ------------------------------------------------------------
+# Funkcja pomocnicza - symulacja testowa dla tuningu
+# ------------------------------------------------------------
+def _uruchom_symulacje_testowa(RegulatorClass, parametry: dict, model_nazwa: str, czas_sym=120.0):
+    """
+    Uruchamia symulację z podanymi parametrami regulatora i modelu.
+    Zwraca wyniki metryk (IAE, Mp, ts, tr) oraz funkcję kary.
+    
+    Args:
+        RegulatorClass: Klasa regulatora (regulator_p, regulator_pi, etc.)
+        parametry: dict z parametrami {"Kp": 1.0, "Ti": 10.0, "Td": 3.0, ...}
+        model_nazwa: nazwa modelu ("zbiornik_1rz", "dwa_zbiorniki", "wahadlo_odwrocone")
+        czas_sym: czas symulacji w sekundach
+        
+    Returns:
+        tuple: (wyniki_metryki, funkcja_kary)
+    """
+    try:
+        # Import modelu
+        ModelClass = _dynamiczny_import("modele", model_nazwa)
+        model = ModelClass()
+        dt = model.dt
+        
+        # Filtruj parametry do sygnatury konstruktora
+        import inspect
+        sig = inspect.signature(RegulatorClass.__init__)
+        parametry_filtr = {k: v for k, v in parametry.items() if k in sig.parameters and v is not None}
+        
+        # Dla strojenia: usuń limity saturacji (umin, umax) żeby regulator mógł swobodnie działać
+        # Model sam zadba o fizyczne ograniczenia
+        # Stwórz regulator z parametrami
+        regulator = RegulatorClass(**parametry_filtr, dt=dt, umin=None, umax=None)
+        
+        # Symulacja
+        kroki = int(czas_sym / dt)
+        t, r, y, u = [], [], [], []
+        
+        # Wartość zadana zależna od modelu
+        r_zad = 0.0 if model_nazwa == "wahadlo_odwrocone" else 1.0
+        
+        for k in range(kroki):
+            t.append(k * dt)
+            y_k = model.y
+            u_k = regulator.update(r_zad, y_k)
+            y_nowe = model.step(u_k)
+            r.append(r_zad)
+            y.append(y_nowe)
+            u.append(u_k)
+        
+        # Oblicz metryki
+        wyniki = oblicz_metryki(t, r, y, u)
+        
+        # Funkcja kary (niższa = lepsza)
+        # Priorytet: IAE + kara za przeregulowanie + kara za wolne ustalanie
+        kara = wyniki.IAE + 0.5 * wyniki.przeregulowanie + 0.01 * wyniki.czas_ustalania
+        
+        # Dodatkowa kara za niestabilność (jeśli regulator nie reaguje)
+        if np.std(u) < 1e-4:
+            kara += 1000.0
+        
+        return wyniki, kara
+        
+    except Exception as e:
+        # W przypadku błędu (np. niestabilność) zwróć wysoką karę
+        print(f"⚠️ Błąd symulacji: {e}")
+        class DummyMetryki:
+            IAE = 999999
+            przeregulowanie = 999
+            czas_ustalania = 999
+            czas_narastania = 999
+        return DummyMetryki(), 999999.0
 
 
 # ------------------------------------------------------------
@@ -94,92 +178,56 @@ def _zapisz_raport_html(meta, parametry, historia=None, out_dir="wyniki"):
 # ------------------------------------------------------------
 # Główna funkcja strojenia
 # ------------------------------------------------------------
-def wykonaj_strojenie(metoda="ziegler_nichols"):
+def wykonaj_strojenie(metoda="ziegler_nichols", model_nazwa="zbiornik_1rz"):
+    """
+    Główna funkcja strojenia regulatora z użyciem prawdziwych symulacji.
+    
+    Args:
+        metoda: "ziegler_nichols", "siatka", "optymalizacja"
+        model_nazwa: nazwa modelu do testowania (domyślnie "zbiornik_1rz")
+        
+    Returns:
+        dict: parametry regulatora
+    """
     out_dir = "wyniki"
     os.makedirs(out_dir, exist_ok=True)
 
-    regulator = os.getenv("REGULATOR", "regulator_pid").lower()
+    regulator_nazwa = os.getenv("REGULATOR", "regulator_pid").lower()
+    print(f"\n{'='*60}")
+    print(f"⚙️ Strojenie: {regulator_nazwa} | metoda: {metoda} | model: {model_nazwa}")
+    print(f"{'='*60}")
+    
+    # Import klasy regulatora
+    RegulatorClass = _dynamiczny_import("regulatory", regulator_nazwa)
+    
+    # --- 1) Wyznacz parametry używając prawdziwych symulacji ---
     historia = []
-
-    # --- 1) Wyznacz parametry pełne (Kp, Ti, Td) ---
+    
     if metoda == "ziegler_nichols":
-        # ZN daje sensowne PID; dla PI/P/PD i tak przytniemy niżej
-        pelne = strojenie_PID(Ku=2.0, Tu=25.0)  # -> Kp≈1.2, Ti≈12.5, Td≈3.12
+        from src.strojenie.ziegler_nichols import strojenie_ZN
+        pelne = strojenie_ZN(RegulatorClass, model_nazwa, regulator_nazwa)
 
     elif metoda == "siatka":
-        # Siatki i funkcje celu dopasowane do typu regulatora
-        if regulator == "regulator_p":
-            pelne = przeszukiwanie_siatki(
-                siatki={"Kp": np.linspace(0.5, 5.0, 20)},
-                funkcja_celu=lambda Kp: (Kp - 2.0) ** 2
-            )
-
-        elif regulator == "regulator_pi":
-            pelne = przeszukiwanie_siatki(
-                siatki={"Kp": np.linspace(0.5, 5.0, 20),
-                        "Ti": np.linspace(5, 60, 30)},
-                funkcja_celu=lambda Kp, Ti: (Kp - 2.0) ** 2 + (Ti - 30.0) ** 2
-            )
-
-        elif regulator == "regulator_pd":
-            pelne = przeszukiwanie_siatki(
-                siatki={"Kp": np.linspace(0.5, 5.0, 20),
-                        "Td": np.linspace(0.0, 10.0, 21)},
-                funkcja_celu=lambda Kp, Td: (Kp - 2.0) ** 2 + (Td - 3.0) ** 2
-            )
-
-        else:  # PID
-            pelne = przeszukiwanie_siatki(
-                siatki={"Kp": np.linspace(0.5, 5.0, 20),
-                        "Ti": np.linspace(5, 60, 30),
-                        "Td": np.linspace(0.0, 10.0, 21)},
-                funkcja_celu=lambda Kp, Ti, Td: (Kp - 2.0) ** 2 + (Ti - 30.0) ** 2 + (Td - 3.0) ** 2
-            )
+        from src.strojenie.przeszukiwanie_siatki import strojenie_siatka
+        pelne = strojenie_siatka(RegulatorClass, model_nazwa, regulator_nazwa, 
+                                _uruchom_symulacje_testowa)
 
     elif metoda == "optymalizacja":
-        # Definicje zależne od typu regulatora (różna liczba zmiennych i cel)
-        if regulator == "regulator_p":
-            def f(x):
-                v = (x[0] - 2.0) ** 2; historia.append(v); return v
-            x0, granice, labels = [1.0], [(0.1, 10)], ["Kp"]
-
-        elif regulator == "regulator_pi":
-            def f(x):
-                v = (x[0] - 2.0) ** 2 + (x[1] - 30.0) ** 2; historia.append(v); return v
-            x0, granice, labels = [1.0, 20.0], [(0.1, 10), (5, 100)], ["Kp", "Ti"]
-
-        elif regulator == "regulator_pd":
-            def f(x):
-                v = (x[0] - 2.0) ** 2 + (x[1] - 3.0) ** 2; historia.append(v); return v
-            # ⬇ KLUCZOWE: druga współrzędna to Td (etykieta 'Td')
-            x0, granice, labels = [1.0, 1.0], [(0.1, 10), (0.0, 10.0)], ["Kp", "Td"]
-
-        else:  # PID
-            def f(x):
-                v = (x[0] - 2.0) ** 2 + (x[1] - 30.0) ** 2 + (x[2] - 3.0) ** 2; historia.append(v); return v
-            x0, granice, labels = [1.0, 20.0, 1.0], [(0.1, 10), (5, 100), (0.0, 10.0)], ["Kp", "Ti", "Td"]
-
-        wynik = optymalizuj_podstawowy(f, x0, granice, labels=labels)
-        print(f"🔍 Wynik optymalizacji dla {regulator}: {wynik}")
-
-        # ujednolicenie formatu
-        pelne = {
-            "Kp": wynik.get("Kp", 1.0),
-            "Ti": wynik.get("Ti", 30.0) if "Ti" in wynik else None,
-            "Td": wynik.get("Td", 3.0) if "Td" in wynik else None
-        }
+        from src.strojenie.optymalizacja_numeryczna import strojenie_optymalizacja
+        pelne, historia = strojenie_optymalizacja(RegulatorClass, model_nazwa, regulator_nazwa,
+                                                  _uruchom_symulacje_testowa)
 
     else:
         raise ValueError(f"❌ Nieznana metoda strojenia: {metoda}")
 
     # --- 2) Przytnij do typu regulatora i zaokrąglij ---
-    params = _filter_for_regulator(regulator, pelne)
+    params = _filter_for_regulator(regulator_nazwa, pelne)
 
     # --- 3) Zapisz JSON + raport HTML ---
-    meta = {"regulator": regulator, "metoda": metoda}
-    out = {"regulator": regulator, "metoda": metoda, "parametry": params}
+    meta = {"regulator": regulator_nazwa, "metoda": metoda, "model": model_nazwa}
+    out = {"regulator": regulator_nazwa, "metoda": metoda, "parametry": params}
 
-    json_path = os.path.join(out_dir, f"parametry_{regulator}_{metoda}.json")
+    json_path = os.path.join(out_dir, f"parametry_{regulator_nazwa}_{metoda}.json")
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2)
     print(f"💾 Zapisano parametry: {json_path}")

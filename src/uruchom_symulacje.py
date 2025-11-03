@@ -54,12 +54,19 @@ def uruchom_symulacje():
         else:
             regulatory_lista = [regulator_env]
 
+        # Dla każdego regulatora i modelu
         for regulator_nazwa in regulatory_lista:
             os.environ["REGULATOR"] = regulator_nazwa
-            print(f"\n⚙️ Strojenie regulatora: {regulator_nazwa}")
-            for metoda in ["ziegler_nichols", "siatka", "optymalizacja"]:
-                print(f"⚙️ Strojenie metodą {metoda.replace('_', ' ').title()}...")
-                wykonaj_strojenie(metoda)
+            
+            # Stroij na każdym modelu osobno
+            for model_nazwa in modele:
+                print(f"\n⚙️ Strojenie regulatora: {regulator_nazwa} na modelu {model_nazwa}")
+                for metoda in ["ziegler_nichols", "siatka", "optymalizacja"]:
+                    print(f"  📊 Metoda: {metoda.replace('_', ' ').title()}...")
+                    try:
+                        wykonaj_strojenie(metoda, model_nazwa=model_nazwa)
+                    except Exception as e:
+                        print(f"  ❌ Błąd podczas strojenia: {e}")
 
         print("✅ Zakończono strojenie wszystkich regulatorów i metod.")
         return
@@ -108,7 +115,8 @@ def uruchom_symulacje():
                 import inspect
                 sig = inspect.signature(Regulator.__init__)
                 parametry_filtr = {k: v for k, v in parametry.items() if k in sig.parameters}
-                regulator = Regulator(**parametry_filtr, dt=dt)
+                # Usuń limity saturacji - model zadba o fizyczne ograniczenia
+                regulator = Regulator(**parametry_filtr, dt=dt, umin=None, umax=None)
 
                 kroki = int(czas_sym / dt)
                 t, r, y, u = [], [], [], []

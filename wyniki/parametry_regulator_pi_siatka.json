@@ -2,8 +2,8 @@
   "regulator": "regulator_pi",
   "metoda": "siatka",
   "parametry": {
-    "Kp": 1.92,
-    "Ti": 29.66,
+    "Kp": 0.1,
+    "Ti": 2.0,
     "Td": null
   }
 }

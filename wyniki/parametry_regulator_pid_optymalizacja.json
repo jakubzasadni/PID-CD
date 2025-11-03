@@ -2,8 +2,8 @@
   "regulator": "regulator_pid",
   "metoda": "optymalizacja",
   "parametry": {
-    "Kp": 2.0,
-    "Ti": 30.0,
-    "Td": 3.0
+    "Kp": 15.0,
+    "Ti": 50.0,
+    "Td": 0.1
   }
 }
