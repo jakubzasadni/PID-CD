@@ -9,7 +9,6 @@ class Metryki:
     przeregulowanie: float  # [%]
     czas_ustalania: float   # [s]
     czas_narastania: float  # [s]
-    energia_sterowania: float
 
 def _first_crossing_time(t, y, level, rising=True):
     """Liniowa interpolacja czasu pierwszego przekroczenia 'level'."""
@@ -36,7 +35,6 @@ def oblicz_metryki(t, r, y, u=None, settle_band=0.02, hold_time=0.0):
     IAE  = np.trapz(np.abs(e), t)
     ISE  = np.trapz(e**2, t)
     ITAE = np.trapz(t * np.abs(e), t)
-    energia_sterowania = np.trapz(u**2, t)
 
     steady_state = r[-1]
     y0 = y[0]
@@ -100,6 +98,5 @@ def oblicz_metryki(t, r, y, u=None, settle_band=0.02, hold_time=0.0):
         IAE=IAE, ISE=ISE, ITAE=ITAE,
         przeregulowanie=przeregulowanie,
         czas_ustalania=czas_ustalania,
-        czas_narastania=czas_narastania,
-        energia_sterowania=energia_sterowania
+        czas_narastania=czas_narastania
     )
