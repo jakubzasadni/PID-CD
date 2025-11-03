@@ -1,0 +1,9 @@
+{
+  "regulator": "regulator_pid",
+  "metoda": "ziegler_nichols",
+  "parametry": {
+    "Kp": 1.2,
+    "Ti": 12.5,
+    "Td": 3.12
+  }
+}

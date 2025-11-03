@@ -1,0 +1,9 @@
+{
+  "regulator": "regulator_pid",
+  "metoda": "optymalizacja",
+  "parametry": {
+    "Kp": 2.0,
+    "Ti": 30.0,
+    "Td": 3.0
+  }
+}

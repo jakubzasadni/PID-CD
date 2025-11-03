@@ -179,8 +179,7 @@ def uruchom_symulacje():
                     f"IAE: {wyniki.IAE:.2f}\n"
                     f"Mp: {wyniki.przeregulowanie:.1f}%\n"
                     f"ts: {wyniki.czas_ustalania:.1f}s\n"
-                    f"tr: {wyniki.czas_narastania:.1f}s\n"
-                    f"Eu: {wyniki.energia_sterowania:.1f}"
+                    f"tr: {wyniki.czas_narastania:.1f}s"
                 )
                 plt.figtext(0.02, 0.02, info_text, fontsize=8, 
                           bbox=dict(facecolor='white', alpha=0.8))
@@ -196,12 +195,10 @@ def uruchom_symulacje():
                     print(f"{status} Wyniki:")
                     print(f"  • IAE={wyniki.IAE:.2f}, ITAE={wyniki.ITAE:.2f}")
                     print(f"  • Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s, tr={wyniki.czas_narastania:.1f}s")
-                    print(f"  • Energia sterowania: {wyniki.energia_sterowania:.1f}")
                 else:
                     print(f"{status} Wyniki:")
                     print(f"  • IAE={wyniki.IAE:.2f}, ITAE={wyniki.ITAE:.2f}")
                     print(f"  • Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s, tr={wyniki.czas_narastania:.1f}s")
-                    print(f"  • Energia sterowania: {wyniki.energia_sterowania:.1f}")
                     print(f"  ❌ Niezaliczone kryteria: {', '.join(powod)}")
 
         print("\n--------------------------------------------------")
