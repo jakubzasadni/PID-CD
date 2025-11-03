@@ -8,7 +8,7 @@ class Regulator_PID(RegulatorBazowy):
     - Proporcjonalne na ważone zadanie: u_P = Kp * (b*r - y)
     - Całkowanie błędu z anti-windup (back-calculation, współczynnik Tt)
     - Różniczkujące na pomiar (filtrowane, współczynnik N)
-    - Opcjonalny feedforward Kr*r (domyślnie Kr=0.0, bo I eliminuje offset)
+    - Feedforward Kr*r dla szybkiej reakcji początkowej (domyślnie Kr=1.0)
 
     Parametry:
     - Kp: wzmocnienie proporcjonalne (domyślnie 1.0)
@@ -17,7 +17,7 @@ class Regulator_PID(RegulatorBazowy):
     - N:  współczynnik filtra pochodnej (domyślnie 10.0)
     - Tt: stała anti-windup (domyślnie Tt=Ti, back-calculation 1:1)
     - b:  waga wartości zadanej w członie P (domyślnie 1.0)
-    - Kr: wzmocnienie feedforward (domyślnie 0.0) — rzadko potrzebne w PID
+    - Kr: wzmocnienie feedforward (domyślnie 1.0) — zapewnia szybki start
     - dt: krok próbkowania (domyślnie 0.05)
     - umin, umax: ograniczenia sygnału (domyślnie 0.0, 1.0)
     """
@@ -31,7 +31,7 @@ class Regulator_PID(RegulatorBazowy):
         umin: float = 0.0,
         umax: float = 1.0,
         b: float = 1.0,
-        Kr: float = 0.0,
+        Kr: float = 1.0,
         N: float = 10.0,
         Tt: float | None = None,
     ):
