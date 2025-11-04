@@ -27,6 +27,7 @@ def strojenie_optymalizacja(RegulatorClass, model_nazwa: str, typ_regulatora: st
     historia = []  # Historia wartości funkcji celu
     
     # Definicja funkcji celu i parametrów startowych w zależności od typu regulatora
+    # RÓWNE WARUNKI: Wszyscy startują z tych samych wartości bazowych
     if typ == "regulator_p":
         def funkcja_celu(x):
             params = {"Kp": x[0], "Ti": None, "Td": None}
@@ -37,7 +38,7 @@ def strojenie_optymalizacja(RegulatorClass, model_nazwa: str, typ_regulatora: st
             except:
                 return 999999.0
         
-        x0 = [1.5]
+        x0 = [2.0]  # Ten sam Kp startowy co reszta
         granice = [(0.1, 15.0)]
         labels = ["Kp"]
     
@@ -51,7 +52,7 @@ def strojenie_optymalizacja(RegulatorClass, model_nazwa: str, typ_regulatora: st
             except:
                 return 999999.0
         
-        x0 = [1.5, 15.0]
+        x0 = [2.0, 15.0]  # Start z typowych wartości PID
         granice = [(0.1, 15.0), (2.0, 50.0)]
         labels = ["Kp", "Ti"]
     
@@ -65,7 +66,7 @@ def strojenie_optymalizacja(RegulatorClass, model_nazwa: str, typ_regulatora: st
             except:
                 return 999999.0
         
-        x0 = [1.5, 2.0]
+        x0 = [2.0, 3.0]  # Start z typowych wartości PID
         granice = [(0.1, 15.0), (0.1, 15.0)]
         labels = ["Kp", "Td"]
     
@@ -80,7 +81,7 @@ def strojenie_optymalizacja(RegulatorClass, model_nazwa: str, typ_regulatora: st
             except:
                 return 999999.0
         
-        x0 = [1.5, 15.0, 2.0]
+        x0 = [2.0, 15.0, 3.0]  # Start z typowych wartości PID
         granice = [(0.1, 15.0), (2.0, 50.0), (0.1, 15.0)]
         labels = ["Kp", "Ti", "Td"]
     

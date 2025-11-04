@@ -2,7 +2,7 @@
   "regulator": "regulator_p",
   "metoda": "siatka",
   "parametry": {
-    "Kp": 10.0,
+    "Kp": 15.0,
     "Ti": null,
     "Td": null
   }

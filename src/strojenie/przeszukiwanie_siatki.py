@@ -26,26 +26,27 @@ def strojenie_siatka(RegulatorClass, model_nazwa: str, typ_regulatora: str,
     
     typ = typ_regulatora.lower()
     
-    # Definicja siatek w zależności od typu regulatora
+    # Definicja siatek - RÓWNE WARUNKI dla wszystkich regulatorów
+    # Wszyscy mają ten sam zakres i gęstość dla Kp
     if typ == "regulator_p":
         siatki = {
-            "Kp": np.linspace(0.1, 10.0, 20)
+            "Kp": np.linspace(0.1, 15.0, 20)  # 20 punktów, zakres [0.1, 15.0]
         }
     elif typ == "regulator_pi":
         siatki = {
-            "Kp": np.linspace(0.1, 8.0, 16),
-            "Ti": np.linspace(2.0, 30.0, 15)
+            "Kp": np.linspace(0.1, 15.0, 20),  # Ten sam zakres co P
+            "Ti": np.linspace(2.0, 50.0, 15)   # Zakres zgodny z optymalizacją
         }
     elif typ == "regulator_pd":
         siatki = {
-            "Kp": np.linspace(0.1, 8.0, 16),
-            "Td": np.linspace(0.1, 10.0, 15)
+            "Kp": np.linspace(0.1, 15.0, 20),  # Ten sam zakres co P
+            "Td": np.linspace(0.1, 15.0, 15)   # Zakres zgodny z optymalizacją
         }
     else:  # PID
         siatki = {
-            "Kp": np.linspace(0.1, 8.0, 12),
-            "Ti": np.linspace(2.0, 30.0, 10),
-            "Td": np.linspace(0.1, 10.0, 10)
+            "Kp": np.linspace(0.1, 15.0, 20),  # Ten sam zakres co P
+            "Ti": np.linspace(2.0, 50.0, 12),  # Zakres zgodny z optymalizacją
+            "Td": np.linspace(0.1, 15.0, 12)   # Zakres zgodny z optymalizacją
         }
     
     keys = list(siatki.keys())
