@@ -2,3 +2,6 @@ numpy
 matplotlib
 scipy
 jinja2
+pyyaml
+tqdm
+joblib

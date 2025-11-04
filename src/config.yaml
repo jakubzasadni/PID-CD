@@ -1,0 +1,116 @@
+# Konfiguracja systemu strojenia regulatorów PID
+# Parametry mogą być nadpisane per model używając kluczy: zbiornik_1rz, dwa_zbiorniki, wahadlo_odwrocone
+
+# Zakresy parametrów dla strojenia
+zakresy_parametrow:
+  default:
+    Kp: [0.1, 30.0]
+    Ti: [2.0, 50.0]
+    Td: [0.1, 15.0]
+  
+  # Specyficzne dla modeli (opcjonalne nadpisanie)
+  zbiornik_1rz:
+    Kp: [0.1, 30.0]
+    Ti: [2.0, 50.0]
+    Td: [0.1, 15.0]
+  
+  dwa_zbiorniki:
+    Kp: [0.1, 25.0]
+    Ti: [2.0, 60.0]
+    Td: [0.1, 15.0]
+  
+  wahadlo_odwrocone:
+    Kp: [0.1, 40.0]
+    Ti: [1.0, 30.0]
+    Td: [0.05, 10.0]
+
+# Wagi funkcji kary (kara = IAE + waga_Mp*Mp + waga_ts*ts + waga_stale_u jeśli u stałe)
+wagi_kary:
+  przeregulowanie: 0.5      # waga dla przeregulowania [%]
+  czas_ustalania: 0.01      # waga dla czasu ustalania [s]
+  sterowanie_stale: 1000    # kara jeśli sterowanie stałe (std(u) < 1e-4)
+
+# Gęstość siatki dla przeszukiwania
+gestosc_siatki:
+  regulator_p:
+    Kp: 25        # 25 punktów
+  
+  regulator_pi:
+    Kp: 20        # 20 × 15 = 300 kombinacji
+    Ti: 15
+  
+  regulator_pd:
+    Kp: 20        # 20 × 15 = 300 kombinacji
+    Td: 15
+  
+  regulator_pid:
+    Kp: 15        # 15 × 12 × 12 = 2160 kombinacji (zamiast 2880)
+    Ti: 12
+    Td: 12
+
+# Adaptacyjne zagęszczanie siatki
+adaptacyjne_przeszukiwanie:
+  enabled: true
+  faza_gruba:
+    gestosc_mnoznik: 0.3    # 30% pierwotnej gęstości dla fazy grubej
+  faza_dokladna:
+    margines_procent: 0.2   # zagęść ±20% zakresu wokół optimum z fazy grubej
+    gestosc_mnoznik: 1.5    # 150% pierwotnej gęstości dla fazy dokładnej
+
+# Optymalizacja numeryczna
+optymalizacja:
+  punkty_startowe:
+    uzyj_ziegler_nichols: true    # użyj wyniku ZN jako punktu startowego
+    liczba_multi_start: 3          # dodatkowe losowe punkty startowe
+    metoda: 'L-BFGS-B'
+    maxiter: 500
+
+# Równoległe wykonywanie
+rownolegle:
+  enabled: true
+  n_jobs: -1    # -1 = użyj wszystkich dostępnych rdzeni
+
+# Logowanie
+logowanie:
+  poziom: 'INFO'          # DEBUG, INFO, WARNING, ERROR
+  plik_log: 'wyniki/strojenie.log'
+  loguj_niepowodzenia: true
+
+# Walidacja
+walidacja:
+  scenariusze:
+    - nazwa: "Skok wartości zadanej (mały)"
+      typ: "setpoint_step"
+      wielkosc: 5.0
+      czas_skoku: 10.0
+    
+    - nazwa: "Skok wartości zadanej (duży)"
+      typ: "setpoint_step"
+      wielkosc: 15.0
+      czas_skoku: 10.0
+    
+    - nazwa: "Zakłócenie na wyjściu"
+      typ: "output_disturbance"
+      wielkosc: -3.0
+      czas_zaklócenia: 60.0
+    
+    - nazwa: "Zakłócenie na wyjściu (dodatnie)"
+      typ: "output_disturbance"
+      wielkosc: 2.0
+      czas_zaklócenia: 60.0
+    
+    - nazwa: "Szum pomiarowy"
+      typ: "measurement_noise"
+      odchylenie_std: 0.1
+  
+  progi_akceptacji:
+    IAE_max: 10.0
+    przeregulowanie_max: 30.0
+    czas_ustalania_max: 50.0
+
+# Raportowanie
+raportowanie:
+  generuj_raport_porownawczy: true
+  format_wykresow: 'png'
+  dpi: 150
+  pokaz_czas_obliczen: true

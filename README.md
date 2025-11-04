@@ -1,3 +1,5 @@
+# Uwaga: Aktualna dokumentacja projektu (v2.0) znajduje się w pliku README_v2.md
+
 # System automatyzacji strojenia i walidacji regulatorów
 
 Projekt inżynierski:

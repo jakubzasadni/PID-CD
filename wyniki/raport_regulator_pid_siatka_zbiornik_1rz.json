@@ -3,17 +3,17 @@
   "regulator": "regulator_pid",
   "metoda": "siatka",
   "parametry": {
-    "Kp": 8.0,
-    "Ti": 30.0,
+    "Kp": 30.0,
+    "Ti": 50.0,
     "Td": 0.1
   },
   "metryki": {
-    "IAE": 2.0870937320956857,
-    "ISE": 0.5385639054544926,
-    "ITAE": 37.50601422788394,
-    "przeregulowanie": 3.108987565997016,
-    "czas_ustalania": 23.900000000000002,
-    "czas_narastania": 2.3480093068959396
+    "IAE": 0.7014821483618418,
+    "ISE": 0.14853581152213544,
+    "ITAE": 14.903057011344117,
+    "przeregulowanie": 0.9037507648170349,
+    "czas_ustalania": 1.5,
+    "czas_narastania": 0.8740617643360155
   },
   "progi": {
     "ts": 120.0,

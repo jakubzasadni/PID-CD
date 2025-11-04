@@ -77,20 +77,37 @@ def _uruchom_symulacje_testowa(RegulatorClass, parametry: dict, model_nazwa: str
         
         # Oblicz metryki
         wyniki = oblicz_metryki(t, r, y, u)
-        
+
+        # Wczytaj wagi funkcji kary z konfiguracji
+        try:
+            import sys
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from konfig import pobierz_konfiguracje
+            cfg = pobierz_konfiguracje()
+            wagi = cfg.pobierz_wagi_kary()
+            w_mp = float(wagi.get('przeregulowanie', 0.5))
+            w_ts = float(wagi.get('czas_ustalania', 0.01))
+            w_const = float(wagi.get('sterowanie_stale', 1000))
+        except Exception:
+            w_mp, w_ts, w_const = 0.5, 0.01, 1000.0
+
         # Funkcja kary (niższa = lepsza)
         # Priorytet: IAE + kara za przeregulowanie + kara za wolne ustalanie
-        kara = wyniki.IAE + 0.5 * wyniki.przeregulowanie + 0.01 * wyniki.czas_ustalania
-        
+        kara = wyniki.IAE + w_mp * wyniki.przeregulowanie + w_ts * wyniki.czas_ustalania
+
         # Dodatkowa kara za niestabilność (jeśli regulator nie reaguje)
         if np.std(u) < 1e-4:
-            kara += 1000.0
+            kara += w_const
         
         return wyniki, kara
         
     except Exception as e:
         # W przypadku błędu (np. niestabilność) zwróć wysoką karę
-        print(f"⚠️ Błąd symulacji: {e}")
+        try:
+            import logging
+            logging.exception(f"Błąd symulacji podczas strojenia: {e}")
+        except Exception:
+            print(f"⚠️ Błąd symulacji: {e}")
         class DummyMetryki:
             IAE = 999999
             przeregulowanie = 999
@@ -157,6 +174,17 @@ def _zapisz_raport_html(meta, parametry, historia=None, out_dir="wyniki"):
             f.write(f"<tr><td>{k}</td><td>{'-' if val is None else val}</td></tr>")
         f.write("</table>")
 
+        # Czas obliczeń (opcjonalnie)
+        try:
+            import sys
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from konfig import pobierz_konfiguracje
+            cfg = pobierz_konfiguracje().pobierz_config_raportowania()
+            if cfg.get('pokaz_czas_obliczen') and meta.get('czas_obliczen_s') is not None:
+                f.write(f"<p><strong>Czas obliczeń:</strong> {meta['czas_obliczen_s']:.2f} s</p>")
+        except Exception:
+            pass
+
         # wykres postępu optymalizacji
         if historia and len(historia) > 1:
             plt.figure()
@@ -197,15 +225,39 @@ def wykonaj_strojenie(metoda="ziegler_nichols", model_nazwa="zbiornik_1rz"):
     print(f"⚙️ Strojenie: {regulator_nazwa} | metoda: {metoda} | model: {model_nazwa}")
     print(f"{'='*60}")
     
+    # Konfiguruj logowanie
+    import logging
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from konfig import pobierz_konfiguracje
+    
+    config = pobierz_konfiguracje()
+    config_log = config.pobierz_config_logowania()
+    
+    os.makedirs(os.path.dirname(config_log['plik_log']), exist_ok=True)
+    logging.basicConfig(
+        level=getattr(logging, config_log['poziom']),
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(config_log['plik_log'], encoding='utf-8'),
+            logging.StreamHandler()
+        ]
+    )
+    
     # Import klasy regulatora
     RegulatorClass = _dynamiczny_import("regulatory", regulator_nazwa)
     
     # --- 1) Wyznacz parametry używając prawdziwych symulacji ---
     historia = []
+    params_zn = None  # Do przekazania jako punkt startowy dla optymalizacji
     
+    import time
+    start_time = time.time()
+
     if metoda == "ziegler_nichols":
         from src.strojenie.ziegler_nichols import strojenie_ZN
         pelne = strojenie_ZN(RegulatorClass, model_nazwa, regulator_nazwa)
+        params_zn = pelne  # Zapisz dla ewentualnego użycia
 
     elif metoda == "siatka":
         from src.strojenie.przeszukiwanie_siatki import strojenie_siatka
@@ -214,18 +266,31 @@ def wykonaj_strojenie(metoda="ziegler_nichols", model_nazwa="zbiornik_1rz"):
 
     elif metoda == "optymalizacja":
         from src.strojenie.optymalizacja_numeryczna import strojenie_optymalizacja
+        
+        # Najpierw uruchom ZN aby uzyskać punkt startowy (jeśli skonfigurowane)
+        if config.pobierz_config_optymalizacji()['punkty_startowe']['uzyj_ziegler_nichols']:
+            try:
+                from src.strojenie.ziegler_nichols import strojenie_ZN
+                params_zn = strojenie_ZN(RegulatorClass, model_nazwa, regulator_nazwa)
+                print(f"ℹ️ Użyję parametrów ZN jako punktu startowego: {params_zn}")
+            except Exception as e:
+                logging.warning(f"Nie udało się uzyskać parametrów ZN: {e}")
+                params_zn = None
+        
         pelne, historia = strojenie_optymalizacja(RegulatorClass, model_nazwa, regulator_nazwa,
-                                                  _uruchom_symulacje_testowa)
+                                                  _uruchom_symulacje_testowa, params_zn)
 
     else:
         raise ValueError(f"❌ Nieznana metoda strojenia: {metoda}")
+
+    czas_obliczen_s = time.time() - start_time
 
     # --- 2) Przytnij do typu regulatora i zaokrąglij ---
     params = _filter_for_regulator(regulator_nazwa, pelne)
 
     # --- 3) Zapisz JSON + raport HTML ---
-    meta = {"regulator": regulator_nazwa, "metoda": metoda, "model": model_nazwa}
-    out = {"regulator": regulator_nazwa, "metoda": metoda, "parametry": params}
+    meta = {"regulator": regulator_nazwa, "metoda": metoda, "model": model_nazwa, "czas_obliczen_s": czas_obliczen_s}
+    out = {"regulator": regulator_nazwa, "metoda": metoda, "parametry": params, "czas_obliczen_s": czas_obliczen_s}
 
     json_path = os.path.join(out_dir, f"parametry_{regulator_nazwa}_{metoda}.json")
     with open(json_path, "w", encoding="utf-8") as f:

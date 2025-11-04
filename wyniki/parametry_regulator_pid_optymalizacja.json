@@ -2,8 +2,9 @@
   "regulator": "regulator_pid",
   "metoda": "optymalizacja",
   "parametry": {
-    "Kp": 15.0,
+    "Kp": 30.0,
     "Ti": 50.0,
     "Td": 0.1
-  }
+  },
+  "czas_obliczen_s": 1.4202258586883545
 }

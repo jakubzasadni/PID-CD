@@ -211,10 +211,59 @@ def uruchom_symulacje():
 
         print("\n--------------------------------------------------")
         print(f"📊 Łącznie PASS: {pass_count}/{total_count} ({100*pass_count/total_count:.1f}%)")
+
+        # === ROZSZERZONA WALIDACJA (opcjonalna) ===
+        try:
+            from src.walidacja_rozszerzona import walidacja_rozszerzona
+            from src.konfig import pobierz_konfiguracje
+
+            print("\n" + "="*60)
+            print("🔬 Uruchamiam rozszerzoną walidację (wiele scenariuszy)...")
+            print("="*60)
+
+            # Waliduj tylko regulatory, które przeszły podstawową walidację
+            for plik in sorted(regulator_files):
+                with open(os.path.join(out_dir, plik), "r") as f:
+                    blob = json.load(f)
+                regulator_nazwa = blob["regulator"]
+                metoda = blob["metoda"]
+                parametry = blob["parametry"]
+
+                for model_nazwa in modele:
+                    walidacja_rozszerzona(regulator_nazwa, metoda, model_nazwa, parametry, out_dir)
+
+        except Exception as e:
+            print(f"⚠️ Rozszerzona walidacja nie powiodła się: {e}")
+
+        # === RAPORTY PORÓWNAWCZE ===
+        try:
+            from src.strojenie.raport_porownawczy import generuj_raport_porownawczy
+
+            print("\n" + "="*60)
+            print("📊 Generuję raporty porównawcze...")
+            print("="*60)
+
+            # Dla każdego regulatora i modelu
+            regulatory_unikalne = set()
+            for plik in regulator_files:
+                with open(os.path.join(out_dir, plik), "r") as f:
+                    blob = json.load(f)
+                regulatory_unikalne.add(blob["regulator"])
+
+            for regulator in sorted(regulatory_unikalne):
+                for model in modele:
+                    try:
+                        generuj_raport_porownawczy(regulator, model, out_dir)
+                    except Exception as e:
+                        print(f"⚠️ Nie udało się wygenerować raportu dla {regulator}/{model}: {e}")
+
+        except Exception as e:
+            print(f"⚠️ Generowanie raportów porównawczych nie powiodło się: {e}")
+
         if pass_count == 0:
-            print("❌ Żaden regulator nie spełnił progów jakości.")
+            print("\n❌ Żaden regulator nie spełnił progów jakości.")
             exit(1)
-        print("✅ Walidacja zakończona.")
+        print("\n✅ Walidacja zakończona.")
         return
 
     # -----------------------------------------------------

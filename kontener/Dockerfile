@@ -9,10 +9,6 @@ COPY . .
 
 ENV PYTHONPATH=/app
 
-RUN pip install --no-cache-dir \
-    numpy \
-    matplotlib \
-    pyyaml \
-    scipy
+RUN pip install --no-cache-dir -r kontener/requirements.txt
 
 CMD ["python", "src/uruchom_pipeline.py"]
