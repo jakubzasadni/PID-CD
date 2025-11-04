@@ -1,0 +1,10 @@
+{
+  "regulator": "regulator_pd",
+  "metoda": "siatka",
+  "parametry": {
+    "Kp": 35.87,
+    "Ti": null,
+    "Td": 0.05
+  },
+  "czas_obliczen_s": 9.097939729690552
+}

@@ -16,7 +16,7 @@ class Regulator_PI(RegulatorBazowy):
     - b:  waga wartości zadanej w członie P (domyślnie 1.0)
     - Kr: wzmocnienie feedforward (domyślnie 1.0) — zapewnia szybki start
     - dt: krok próbkowania (domyślnie 0.05)
-    - umin, umax: ograniczenia sygnału (domyślnie 0.0, 1.0)
+    - umin, umax: ograniczenia sygnału (domyślnie None — brak saturacji)
     
     Nieużywane w PI (dla kompatybilności z PD/PID):
     - Td, N (ignorowane)
@@ -27,9 +27,9 @@ class Regulator_PI(RegulatorBazowy):
         Kp: float = 1.0,
         Ti: float = 10.0,
         Td: float | None = None,
-        dt: float = 0.05,
-        umin: float = 0.0,
-        umax: float = 1.0,
+    dt: float = 0.05,
+    umin=None,
+    umax=None,
         b: float = 1.0,
         Kr: float = 1.0,
         N: float | None = None,
@@ -57,6 +57,8 @@ class Regulator_PI(RegulatorBazowy):
         self._ui = 0.0  # suma całkująca
 
         # Walidacja
+        if self.dt <= 0:
+            raise ValueError("dt musi być > 0")
         if self.Ti <= 0:
             raise ValueError("Ti musi być > 0")
         if self.Tt <= 0:
@@ -67,6 +69,9 @@ class Regulator_PI(RegulatorBazowy):
         self._ui = 0.0
 
     def update(self, r: float, y: float) -> float:
+        # Walidacja czasu próbkowania
+        if self.dt <= 0:
+            raise ValueError("dt musi być > 0")
         # Część proporcjonalna (waga b)
         e_w = self.b * r - y
         u_p = self.Kp * e_w

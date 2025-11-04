@@ -12,7 +12,7 @@ class regulator_p(RegulatorBazowy):
     - b:  waga wartości zadanej w członie P (domyślnie 1.0)
     - Kr: wzmocnienie feedforward (domyślnie 1.0) — kompensuje offset
     - dt: krok próbkowania (domyślnie 0.05)
-    - umin, umax: ograniczenia sygnału sterującego (domyślnie None)
+    - umin, umax: ograniczenia sygnału sterującego (domyślnie None — brak saturacji)
     
     Nieużywane w P (dla kompatybilności z PI/PD/PID):
     - Ti, Td, N, Tt (ignorowane)
@@ -46,6 +46,9 @@ class regulator_p(RegulatorBazowy):
         super().reset()
 
     def update(self, r: float, y: float) -> float:
+        # Walidacja czasu próbkowania
+        if self.dt <= 0:
+            raise ValueError("dt musi być > 0")
         # Część proporcjonalna z wagą b
         e_w = self.b * r - y
         u_p = self.Kp * e_w

@@ -1,0 +1,25 @@
+{
+  "model": "dwa_zbiorniki",
+  "regulator": "regulator_pi",
+  "metoda": "optymalizacja",
+  "parametry": {
+    "Kp": 0.1,
+    "Ti": 30.0,
+    "Td": null
+  },
+  "metryki": {
+    "IAE": 12.577899264570517,
+    "ISE": 6.639890252362004,
+    "ITAE": 253.70485472301428,
+    "przeregulowanie": 2.9686839338666617,
+    "czas_ustalania": 119.95,
+    "czas_narastania": 17.086402720505962
+  },
+  "progi": {
+    "ts": 120.0,
+    "IAE": 80.0,
+    "Mp": 20.0
+  },
+  "PASS": true,
+  "niezaliczone": []
+}

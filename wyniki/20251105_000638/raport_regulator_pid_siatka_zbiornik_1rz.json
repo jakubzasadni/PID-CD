@@ -1,0 +1,25 @@
+{
+  "model": "zbiornik_1rz",
+  "regulator": "regulator_pid",
+  "metoda": "siatka",
+  "parametry": {
+    "Kp": 30.0,
+    "Ti": 50.0,
+    "Td": 0.1
+  },
+  "metryki": {
+    "IAE": 0.7014821483618418,
+    "ISE": 0.14853581152213544,
+    "ITAE": 14.903057011344117,
+    "przeregulowanie": 0.9037507648170349,
+    "czas_ustalania": 1.5,
+    "czas_narastania": 0.8740617643360155
+  },
+  "progi": {
+    "ts": 120.0,
+    "IAE": 50.0,
+    "Mp": 15.0
+  },
+  "PASS": true,
+  "niezaliczone": []
+}

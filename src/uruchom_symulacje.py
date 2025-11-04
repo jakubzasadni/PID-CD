@@ -5,12 +5,22 @@ Obsługuje również tryb REGULATOR=all (P, PI, PD, PID).
 """
 
 import os
+import sys
 import importlib
 import json
 import numpy as np
 import matplotlib.pyplot as plt
 from src.metryki import oblicz_metryki
 from src.strojenie.wykonaj_strojenie import wykonaj_strojenie
+
+# Bezpieczna konfiguracja wyjścia konsoli (Windows cp1250 vs emoji)
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
 
 def dynamiczny_import(typ: str, nazwa: str):
@@ -221,7 +231,16 @@ def uruchom_symulacje():
             print("🔬 Uruchamiam rozszerzoną walidację (wiele scenariuszy)...")
             print("="*60)
 
-            # Waliduj tylko regulatory, które przeszły podstawową walidację
+            # Waliduj tylko kombinacje (regulator, metoda, model), które przeszły podstawową walidację
+            passed_keys = set()
+            for model_nazwa in modele:
+                for plik in sorted(os.listdir(out_dir)):
+                    if plik.startswith("raport_") and plik.endswith(f"_{model_nazwa}.json") and "rozszerzony" not in plik:
+                        with open(os.path.join(out_dir, plik), "r") as f:
+                            rb = json.load(f)
+                        if rb.get("PASS", False):
+                            passed_keys.add((rb.get("regulator"), rb.get("metoda"), model_nazwa))
+
             for plik in sorted(regulator_files):
                 with open(os.path.join(out_dir, plik), "r") as f:
                     blob = json.load(f)
@@ -230,7 +249,10 @@ def uruchom_symulacje():
                 parametry = blob["parametry"]
 
                 for model_nazwa in modele:
-                    walidacja_rozszerzona(regulator_nazwa, metoda, model_nazwa, parametry, out_dir)
+                    if (regulator_nazwa, metoda, model_nazwa) in passed_keys:
+                        walidacja_rozszerzona(regulator_nazwa, metoda, model_nazwa, parametry, out_dir)
+                    else:
+                        print(f"  ⏭️ Pomijam rozszerzoną walidację dla {regulator_nazwa} / {metoda} / {model_nazwa} (FAIL w podstawowej walidacji)")
 
         except Exception as e:
             print(f"⚠️ Rozszerzona walidacja nie powiodła się: {e}")

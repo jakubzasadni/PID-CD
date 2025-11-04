@@ -1,0 +1,25 @@
+{
+  "model": "wahadlo_odwrocone",
+  "regulator": "regulator_pid",
+  "metoda": "optymalizacja",
+  "parametry": {
+    "Kp": 24.94,
+    "Ti": 30.0,
+    "Td": 0.06
+  },
+  "metryki": {
+    "IAE": 0.0020848983314439217,
+    "ISE": 1.089137644045468e-05,
+    "ITAE": 0.033655536828484364,
+    "przeregulowanie": 0.5487271496509771,
+    "czas_ustalania": 0.13,
+    "czas_narastania": 0.08325589146032021
+  },
+  "progi": {
+    "ts": 120.0,
+    "IAE": 10.0,
+    "Mp": 50.0
+  },
+  "PASS": true,
+  "niezaliczone": []
+}

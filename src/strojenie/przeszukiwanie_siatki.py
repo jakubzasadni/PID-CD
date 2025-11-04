@@ -181,8 +181,15 @@ def strojenie_siatka(RegulatorClass, model_nazwa: str, typ_regulatora: str,
             params["Td"] = None
         kombinacje_params.append(params)
     
+    # Zabezpieczenie: wyłącz równoległość dla bardzo dużych siatek (unikaj crashy joblib na Windows)
+    bezpieczny_limit_parallel = 500
+    czy_rownolegle_bezpieczne = czy_rownolegle and n_jobs != 1 and total_tests <= bezpieczny_limit_parallel
+    
+    if not czy_rownolegle_bezpieczne and total_tests > bezpieczny_limit_parallel:
+        logging.info(f"  ⚠️ Duża siatka ({total_tests} kombinacji): wyłączono równoległość dla stabilności")
+    
     # Testuj równolegle lub sekwencyjnie
-    if czy_rownolegle and n_jobs != 1:
+    if czy_rownolegle_bezpieczne:
         # Równoległe wykonywanie
         wyniki = Parallel(n_jobs=n_jobs)(
             delayed(_testuj_kombinacje)(RegulatorClass, params, model_nazwa, funkcja_symulacji_testowej)
@@ -243,8 +250,14 @@ def strojenie_siatka(RegulatorClass, model_nazwa: str, typ_regulatora: str,
                 params["Td"] = None
             kombinacje_params_faza2.append(params)
         
+        # Zabezpieczenie: wyłącz równoległość dla bardzo dużych siatek
+        czy_rownolegle_faza2 = czy_rownolegle and n_jobs != 1 and total_tests_faza2 <= bezpieczny_limit_parallel
+        
+        if not czy_rownolegle_faza2 and total_tests_faza2 > bezpieczny_limit_parallel:
+            logging.info(f"  ⚠️ Duża siatka faza 2 ({total_tests_faza2} kombinacji): wyłączono równoległość")
+        
         # Testuj równolegle lub sekwencyjnie
-        if czy_rownolegle and n_jobs != 1:
+        if czy_rownolegle_faza2:
             wyniki_faza2 = Parallel(n_jobs=n_jobs)(
                 delayed(_testuj_kombinacje)(RegulatorClass, params, model_nazwa, funkcja_symulacji_testowej)
                 for params in tqdm(kombinacje_params_faza2, desc="  Zagęszczanie", unit="kombinacja")

@@ -1,0 +1,25 @@
+{
+  "model": "wahadlo_odwrocone",
+  "regulator": "regulator_pd",
+  "metoda": "ziegler_nichols",
+  "parametry": {
+    "Kp": 9.0,
+    "Ti": null,
+    "Td": 0.5
+  },
+  "metryki": {
+    "IAE": 0.00883935718587316,
+    "ISE": 7.808102357133632e-05,
+    "ITAE": 0.004435860945354336,
+    "przeregulowanie": 0.0,
+    "czas_ustalania": 1.92,
+    "czas_narastania": 1.0791415671027202
+  },
+  "progi": {
+    "ts": 120.0,
+    "IAE": 10.0,
+    "Mp": 50.0
+  },
+  "PASS": true,
+  "niezaliczone": []
+}

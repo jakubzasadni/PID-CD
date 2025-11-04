@@ -52,8 +52,12 @@ class regulator_pd(RegulatorBazowy):
         # Stany wewnętrzne filtra D
         self._vd = 0.0
         self._y_prev = None  # typ: Optional[float]
+        # Buforowane współczynniki filtra D
+        self._a_d = 0.0
+        self._beta_d = 0.0
+        self._d_ready = False
 
-        # Walidacja podstawowa
+    # Walidacja podstawowa
         if self.dt <= 0:
             raise ValueError("dt musi być > 0")
         if self.Td < 0:
@@ -77,10 +81,13 @@ class regulator_pd(RegulatorBazowy):
 
         # Część różniczkująca na pomiar (bez pochodnej z r, brak "kopa")
         if self.Td > 0.0:
-            a = self.Td / (self.Td + self.N * self.dt)
-            beta = (self.Kp * self.Td * self.N) / (self.Td + self.N * self.dt)
+            if not self._d_ready:
+                denom = (self.Td + self.N * self.dt)
+                self._a_d = self.Td / denom
+                self._beta_d = (self.Kp * self.Td * self.N) / denom
+                self._d_ready = True
             dy = y - self._y_prev
-            self._vd = a * self._vd - beta * dy
+            self._vd = self._a_d * self._vd - self._beta_d * dy
         else:
             self._vd = 0.0
 

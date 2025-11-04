@@ -217,7 +217,8 @@ def wykonaj_strojenie(metoda="ziegler_nichols", model_nazwa="zbiornik_1rz"):
     Returns:
         dict: parametry regulatora
     """
-    out_dir = "wyniki"
+    # Katalog wyników: respektuj OUT_DIR z pipeline, fallback do 'wyniki'
+    out_dir = os.getenv("OUT_DIR", "wyniki")
     os.makedirs(out_dir, exist_ok=True)
 
     regulator_nazwa = os.getenv("REGULATOR", "regulator_pid").lower()
