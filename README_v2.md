@@ -1,5 +1,7 @@
 # System automatyzacji strojenia i walidacji regulatorów
 
+![Pipeline Time](wyniki/pipeline_badge.svg)
+
 Projekt inżynierski:
 **Automatyzacja procesu strojenia, walidacji i wdrożeń aplikacji sterowania procesami w środowisku Kubernetes z wykorzystaniem narzędzi CI/CD**
 
@@ -18,6 +20,13 @@ Nowości w wersji 2.0:
 - rozszerzona walidacja (wiele scenariuszy: różne skoki r, zakłócenia, szum),
 - raporty porównawcze metod strojenia (HTML + wykresy),
 - logowanie do pliku `wyniki/strojenie.log` i paski postępu.
+
+**Nowości w wersji 2.1 (CI/CD Enhanced):**
+- 📊 **Metryki pipeline** - automatyczny pomiar czasu każdego etapu
+- 📈 **Raport końcowy** - profesjonalne porównanie wszystkich metod (HTML + CSV + wykresy)
+- 🚀 **Automatyczne wdrożenie GitOps** - aktualizacja ConfigMap w Kubernetes po walidacji
+- 📉 **Historia eksperymentów** - tracking wszystkich uruchomień pipeline
+- ⏱️ **Badge czasu pipeline** - wizualizacja wydajności CI/CD
 
 ## ⚙️ Uruchomienie lokalne (Docker)
 ```bash
@@ -55,3 +64,54 @@ python src/uruchom_symulacje.py
   - `wagi_kary` – wagi przeregulowania i czasu ustalania; kara za stałe u,
   - `walidacja` – lista scenariuszy + progi,
   - `raportowanie` – format, DPI, flagi.
+
+## 🎯 Nowe narzędzia (v2.1)
+
+### 1. Raport końcowy porównawczy
+Generuje profesjonalny raport HTML z porównaniem wszystkich metod:
+```powershell
+python src/raport_koncowy.py --wyniki-dir wyniki
+```
+**Zawiera:**
+- Tabele porównawcze dla każdego modelu
+- Wykresy pudełkowe (boxplot) IAE
+- Heatmapa czasu obliczeń
+- Ranking metod (wielokryterialna ocena)
+- Eksport danych do CSV
+- Automatyczne wnioski i rekomendacje
+
+**Wyniki:** `wyniki/raport_koncowy_<timestamp>/`
+
+### 2. Automatyczne wdrożenie GitOps
+Wdraża najlepsze parametry do Kubernetes przez GitOps:
+```powershell
+python src/wdrozenie_gitops.py --gitops-repo ../cl-gitops-regulatory
+```
+**Funkcje:**
+- Wybiera najlepsze parametry na podstawie IAE
+- Tworzy/aktualizuje ConfigMapy
+- Dodaje adnotacje z metrykami do deploymentów
+- Commituje zmiany z opisem
+- (Opcjonalnie) Push do remote
+
+**Opcje:**
+- `--no-commit` - tylko aktualizuj pliki bez commitu
+- `--push` - automatyczny push do remote
+- `--model zbiornik_1rz` - wdróż tylko konkretny model
+
+### 3. Metryki CI/CD Pipeline
+Automatyczny pomiar czasu i generowanie raportów:
+```powershell
+# Metryki są automatycznie zbierane podczas uruchomienia pipeline
+python src/uruchom_pipeline.py
+```
+**Generowane pliki:**
+- `wyniki/pipeline_metrics.json` - metryki ostatniego uruchomienia
+- `wyniki/pipeline_history.json` - historia 50 ostatnich runów
+- `wyniki/pipeline_badge.svg` - badge z czasem pipeline
+- `wyniki/WYNIKI_EKSPERYMENTOW.md` - raport markdown z porównaniem do manualnego strojenia
+
+**Zobacz raport:**
+```powershell
+cat wyniki/WYNIKI_EKSPERYMENTOW.md
+```

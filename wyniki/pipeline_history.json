@@ -1,0 +1,25 @@
+[
+  {
+    "start_time": "2025-11-06T11:03:42.627993",
+    "etapy": {
+      "Test strojenia": {
+        "czas_s": 1.0,
+        "status": "success",
+        "koniec": "2025-11-06T11:03:43.630992"
+      },
+      "Test walidacji": {
+        "czas_s": 0.5,
+        "status": "success",
+        "koniec": "2025-11-06T11:03:44.131876"
+      },
+      "Test raportowania": {
+        "czas_s": 0.3,
+        "status": "success",
+        "koniec": "2025-11-06T11:03:44.432881"
+      }
+    },
+    "status": "success",
+    "end_time": "2025-11-06T11:03:44.432881",
+    "total_time_s": 1.8
+  }
+]

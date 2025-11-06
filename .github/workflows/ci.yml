@@ -210,6 +210,20 @@ jobs:
             -v ${{ github.workspace }}/wyniki:/app/wyniki \
             regulator-sim:test python src/ocena_metod.py || echo "⚠️ Brak raportów do oceny w katalogu: wyniki"
 
+      - name: Generuj raport końcowy porównawczy (NEW v2.1)
+        run: |
+          echo "📊 Generowanie raportu końcowego..."
+          docker run --rm \
+            -v ${{ github.workspace }}/wyniki:/app/wyniki \
+            regulator-sim:test python src/raport_koncowy.py --wyniki-dir /app/wyniki || echo "⚠️ Błąd przy generowaniu raportu końcowego"
+
+      - name: Generuj metryki CI/CD (NEW v2.1)
+        run: |
+          echo "📈 Generowanie metryk pipeline..."
+          docker run --rm \
+            -v ${{ github.workspace }}/wyniki:/app/wyniki \
+            regulator-sim:test python -c "from src.metryki_pipeline import MetrykiPipeline; m = MetrykiPipeline('/app/wyniki'); m.generuj_badge_svg(); m.generuj_raport_markdown()" || echo "⚠️ Błąd przy generowaniu metryk"
+
       - name: Sprawdź wyniki i zdecyduj o statusie
         run: |
           cd wyniki
@@ -283,7 +297,7 @@ jobs:
             docker push "$IMAGE"
           done
 
-      - name: Update GitOps repository
+      - name: Update GitOps repository (automated v2.1)
         if: steps.read_models.outputs.has_models == 'true'
         env:
           GITOPS_REPO: "https://github.com/JakubZasadni/cl-gitops-regulatory.git"
@@ -292,23 +306,41 @@ jobs:
           set -e
           echo "🧩 Klonuję repozytorium GitOps..."
           git clone https://${GH_TOKEN}@github.com/JakubZasadni/cl-gitops-regulatory.git gitops
+          
+          echo "🚀 Automatyczne wdrożenie przez nowy skrypt..."
+          docker run --rm \
+            -v ${{ github.workspace }}/wyniki:/app/wyniki \
+            -v ${{ github.workspace }}/gitops:/app/gitops \
+            regulator-sim:test python src/wdrozenie_gitops.py \
+              --wyniki-dir /app/wyniki \
+              --gitops-repo /app/gitops \
+              --push || echo "⚠️ Wdrożenie GitOps zakończone z ostrzeżeniami"
+          
           cd gitops
-
-          for MODEL in ${{ steps.read_models.outputs.models }}; do
-            SAFE_MODEL=$(echo "$MODEL" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
-            echo "🔧 Aktualizuję manifest dla modelu: $SAFE_MODEL"
-            yq -i ".spec.template.spec.containers[0].image = \"ghcr.io/${{ github.repository_owner }}/${SAFE_MODEL}-regulator:latest\"" kustomize/apps/${SAFE_MODEL}/base/deployment.yml || echo "⚠️ Brak pliku deployment.yml dla $SAFE_MODEL"
-          done
-
           git config user.email "ci@github"
           git config user.name "GitHub Actions"
 
-          echo "🔍 Sprawdzam, czy są zmiany..."
+          echo "🔍 Sprawdzam zmiany w GitOps..."
           if git diff --quiet; then
-            echo "✅ Brak zmian do zapisania — pomijam commit."
+            echo "✅ Brak zmian do zapisania — pomijam push."
           else
-            echo "📦 Commituję zmiany..."
-            git add .
-            git commit -m "auto-deploy: updated images for passed models"
+            echo "📦 Wypycham zmiany GitOps..."
             git push origin main || (echo '❌ Git push failed, sprawdź uprawnienia GH_TOKEN' && exit 1)
+          fi
+          
+          echo "🏷️ Aktualizuję tagi obrazów Docker..."
+          cd ..
+          for MODEL in ${{ steps.read_models.outputs.models }}; do
+            SAFE_MODEL=$(echo "$MODEL" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+            echo "🔧 Aktualizuję obraz dla modelu: $SAFE_MODEL"
+            yq -i ".spec.template.spec.containers[0].image = \"ghcr.io/${{ github.repository_owner }}/${SAFE_MODEL}-regulator:latest\"" gitops/kustomize/apps/${SAFE_MODEL}/base/deployment.yml || echo "⚠️ Brak pliku deployment.yml dla $SAFE_MODEL"
+          done
+          
+          cd gitops
+          if git diff --quiet; then
+            echo "✅ Obrazy już aktualne"
+          else
+            git add .
+            git commit -m "auto-deploy: updated Docker images for passed models [ci skip]"
+            git push origin main
           fi
