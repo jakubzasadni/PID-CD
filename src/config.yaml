@@ -15,9 +15,9 @@ zakresy_parametrow:
     Td: [0.1, 15.0]
   
   dwa_zbiorniki:
-    Kp: [0.1, 25.0]
-    Ti: [2.0, 60.0]
-    Td: [0.1, 15.0]
+    Kp: [0.1, 10.0]    # Obniżone z 25.0 - poprzednie było zbyt agresywne (50% przeregulowanie PID)
+    Ti: [10.0, 100.0]   # Zwiększone dla lepszej stabilności
+    Td: [0.1, 5.0]      # Obniżone - mniej agresywne działanie różniczkujące
   
   wahadlo_odwrocone:
     Kp: [0.1, 40.0]

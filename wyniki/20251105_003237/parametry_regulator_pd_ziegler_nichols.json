@@ -2,9 +2,9 @@
   "regulator": "regulator_pd",
   "metoda": "ziegler_nichols",
   "parametry": {
-    "Kp": 9.0,
+    "Kp": 3.0,
     "Ti": null,
-    "Td": 0.5
+    "Td": 3.75
   },
   "czas_obliczen_s": 0.0
 }
