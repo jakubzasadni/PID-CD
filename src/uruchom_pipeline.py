@@ -46,16 +46,16 @@ def main():
 
         # Etap 3: Ocena
         with metryki.zmierz_etap("Ocena i porównanie metod"):
-            print("\n📊 [3/3] Porównanie wyników i wybór najlepszego regulatora...")
+            print("\n[ANALIZA] [3/3] Porównanie wyników i wybór najlepszego regulatora...")
             ocena_metod(raport_folder)
 
-        print(f"\n✅ Pipeline zakończony pomyślnie. Wyniki zapisano w: {raport_folder}")
+        print(f"\n[OK] Pipeline zakończony pomyślnie. Wyniki zapisano w: {raport_folder}")
         
         # Zakończ pomiar i zapisz metryki
         metryki.zakoncz_run("success")
         
     except Exception as e:
-        print(f"\n❌ Pipeline zakończony błędem: {e}")
+        print(f"\n[X] Pipeline zakończony błędem: {e}")
         metryki.zakoncz_run("failed")
         raise
     

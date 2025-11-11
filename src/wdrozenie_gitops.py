@@ -37,7 +37,7 @@ class WdrozenieGitOps:
         
     def wczytaj_najlepsze_parametry(self, model: str) -> Optional[Dict]:
         """Wczytuje najlepsze parametry dla danego modelu z plików JSON."""
-        print(f"\n📂 Szukanie najlepszych parametrów dla modelu: {model}")
+        print(f"\n Szukanie najlepszych parametrów dla modelu: {model}")
         
         # Szukaj plików walidacji dla tego modelu
         raporty = []
@@ -54,16 +54,16 @@ class WdrozenieGitOps:
                         if raport.get("PASS", False):
                             raporty.append(raport)
                     except Exception as e:
-                        print(f"⚠️ Błąd przy czytaniu {plik}: {e}")
+                        print(f"[UWAGA] Błąd przy czytaniu {plik}: {e}")
         
         if not raporty:
-            print(f"❌ Brak raportów PASS dla modelu {model}")
+            print(f"[X] Brak raportów PASS dla modelu {model}")
             return None
         
         # Wybierz najlepszy na podstawie IAE
         najlepszy = min(raporty, key=lambda r: r.get("metryki", {}).get("IAE", float("inf")))
         
-        print(f"✅ Najlepszy raport dla {model}:")
+        print(f"[OK] Najlepszy raport dla {model}:")
         print(f"   Regulator: {najlepszy.get('regulator')}")
         print(f"   Metoda: {najlepszy.get('metoda')}")
         print(f"   IAE: {najlepszy.get('metryki', {}).get('IAE', 'N/A'):.2f}")
@@ -86,11 +86,11 @@ class WdrozenieGitOps:
                     break
         
         if not param_file.exists():
-            print(f"⚠️ Nie znaleziono pliku z parametrami: {param_file}")
+            print(f"[UWAGA] Nie znaleziono pliku z parametrami: {param_file}")
             # Spróbuj wyciągnąć parametry z raportu
             parametry = najlepszy.get("parametry", {})
             if parametry:
-                print("✅ Użyto parametrów z raportu walidacji")
+                print("[OK] Użyto parametrów z raportu walidacji")
                 return {
                     "regulator": regulator,
                     "metoda": metoda,
@@ -137,7 +137,7 @@ class WdrozenieGitOps:
         app_path = self.gitops_repo / "kustomize" / "apps" / app_name / "base"
         
         if not app_path.exists():
-            print(f"❌ Nie znaleziono ścieżki aplikacji: {app_path}")
+            print(f"[X] Nie znaleziono ścieżki aplikacji: {app_path}")
             return False
         
         # 1. Utwórz/zaktualizuj ConfigMap
@@ -147,13 +147,13 @@ class WdrozenieGitOps:
         with open(configmap_file, "w", encoding="utf-8") as f:
             f.write(configmap_yaml)
         
-        print(f"✅ ConfigMap zapisana: {configmap_file}")
+        print(f"[OK] ConfigMap zapisana: {configmap_file}")
         
         # 2. Zaktualizuj deployment.yml - dodaj volumeMounts dla ConfigMap
         deployment_file = app_path / "deployment.yml"
         
         if not deployment_file.exists():
-            print(f"⚠️ Brak pliku deployment.yml w {app_path}")
+            print(f"[UWAGA] Brak pliku deployment.yml w {app_path}")
             return False
         
         with open(deployment_file, "r", encoding="utf-8") as f:
@@ -215,7 +215,7 @@ class WdrozenieGitOps:
         with open(deployment_file, "w", encoding="utf-8") as f:
             yaml.dump(deployment, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
         
-        print(f"✅ Deployment zaktualizowany: {deployment_file}")
+        print(f"[OK] Deployment zaktualizowany: {deployment_file}")
         
         # 3. Zaktualizuj kustomization.yml - dodaj configmap.yml do resources
         kustomization_file = app_path / "kustomization.yml"
@@ -233,14 +233,14 @@ class WdrozenieGitOps:
             with open(kustomization_file, "w", encoding="utf-8") as f:
                 yaml.dump(kustomization, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
             
-            print(f"✅ Kustomization zaktualizowany: {kustomization_file}")
+            print(f"[OK] Kustomization zaktualizowany: {kustomization_file}")
         
         return True
     
     def git_commit(self, model: str, parametry_info: Dict):
         """Tworzy commit w repozytorium GitOps."""
         if not self.auto_commit:
-            print("⏭️ Auto-commit wyłączony, pomijam commit")
+            print("[SKIP] Auto-commit wyłączony, pomijam commit")
             return
         
         app_name = self.model_to_app.get(model)
@@ -272,7 +272,7 @@ class WdrozenieGitOps:
                          check=True,
                          capture_output=True)
             
-            print(f"✅ Git commit utworzony")
+            print(f"[OK] Git commit utworzony")
             
             # Push jeśli włączony
             if self.auto_push:
@@ -281,12 +281,12 @@ class WdrozenieGitOps:
                              cwd=str(self.gitops_repo),
                              check=True,
                              capture_output=True)
-                print("✅ Zmiany wypchnięte do remote")
+                print("[OK] Zmiany wypchnięte do remote")
             else:
-                print("⏭️ Auto-push wyłączony - użyj 'git push' ręcznie")
+                print("[SKIP] Auto-push wyłączony - użyj 'git push' ręcznie")
                 
         except subprocess.CalledProcessError as e:
-            print(f"⚠️ Błąd Git: {e}")
+            print(f"[UWAGA] Błąd Git: {e}")
             print(f"   stdout: {e.stdout.decode('utf-8') if e.stdout else ''}")
             print(f"   stderr: {e.stderr.decode('utf-8') if e.stderr else ''}")
     
@@ -297,13 +297,13 @@ class WdrozenieGitOps:
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(wdrozone, f, indent=2, ensure_ascii=False)
         
-        print(f"\n✅ Podsumowanie wdrożenia zapisane: {output_file}")
+        print(f"\n[OK] Podsumowanie wdrożenia zapisane: {output_file}")
         
         # Wygeneruj też markdown dla README
         md_file = self.wyniki_dir / "OSTATNIE_WDROZENIE.md"
         
         md = []
-        md.append("# 🚀 Ostatnie wdrożenie regulatorów\n")
+        md.append("# Ostatnie wdrożenie regulatorów\n")
         md.append(f"**Data wdrożenia:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         md.append("## Wdrożone modele\n")
         
@@ -316,17 +316,17 @@ class WdrozenieGitOps:
             md.append(f"  - IAE: `{info['metryki'].get('IAE', 'N/A'):.2f}`\n")
             md.append(f"  - Mp: `{info['metryki'].get('przeregulowanie', 'N/A'):.1f}%`\n")
             md.append(f"  - ts: `{info['metryki'].get('czas_ustalania', 'N/A'):.2f}s`\n")
-            md.append(f"- **Status:** ✅ DEPLOYED\n\n")
+            md.append(f"- **Status:** [OK] DEPLOYED\n\n")
         
         with open(md_file, "w", encoding="utf-8") as f:
             f.write("".join(md))
         
-        print(f"✅ Markdown wdrożenia zapisany: {md_file}")
+        print(f"[OK] Markdown wdrożenia zapisany: {md_file}")
     
     def wdroz_wszystkie_modele(self):
         """Wdraża najlepsze regulatory dla wszystkich modeli."""
         print("=" * 70)
-        print("🚀 AUTOMATYCZNE WDROŻENIE GITOPS")
+        print("[START] AUTOMATYCZNE WDROŻENIE GITOPS")
         print("=" * 70)
         print(f"Repozytorium GitOps: {self.gitops_repo.resolve()}")
         print(f"Auto-commit: {self.auto_commit}")
@@ -336,21 +336,21 @@ class WdrozenieGitOps:
         
         for model, app_name in self.model_to_app.items():
             print(f"\n{'='*70}")
-            print(f"📦 Model: {model} → Aplikacja: {app_name}")
+            print(f" Model: {model} → Aplikacja: {app_name}")
             print('='*70)
             
             # 1. Wczytaj najlepsze parametry
             parametry_info = self.wczytaj_najlepsze_parametry(model)
             
             if not parametry_info:
-                print(f"⏭️ Pomijam model {model} - brak danych")
+                print(f"[SKIP] Pomijam model {model} - brak danych")
                 continue
             
             # 2. Aktualizuj deployment
             success = self.aktualizuj_deployment(app_name, parametry_info)
             
             if not success:
-                print(f"❌ Błąd podczas aktualizacji {app_name}")
+                print(f"[X] Błąd podczas aktualizacji {app_name}")
                 continue
             
             # 3. Commit (jeśli włączony)
@@ -363,10 +363,10 @@ class WdrozenieGitOps:
             self.generuj_podsumowanie(wdrozone)
             
             print("\n" + "=" * 70)
-            print("✅ WDROŻENIE ZAKOŃCZONE POMYŚLNIE")
+            print("[OK] WDROŻENIE ZAKOŃCZONE POMYŚLNIE")
             print("=" * 70)
-            print(f"\n📊 Wdrożono {len(wdrozone)}/{len(self.model_to_app)} modeli")
-            print("\n🔍 Następne kroki:")
+            print(f"\n[ANALIZA] Wdrożono {len(wdrozone)}/{len(self.model_to_app)} modeli")
+            print("\n[SZUKANIE] Następne kroki:")
             
             if self.auto_commit and not self.auto_push:
                 print("  1. Sprawdź zmiany: cd", self.gitops_repo.resolve(), "&& git status")
@@ -380,7 +380,7 @@ class WdrozenieGitOps:
                 print("  2. Zatwierdź i wypchnij ręcznie")
                 print("  3. ArgoCD/FluxCD automatycznie wdroży na klaster")
         else:
-            print("\n⚠️ Brak modeli do wdrożenia")
+            print("\n[UWAGA] Brak modeli do wdrożenia")
         
         return wdrozone
 

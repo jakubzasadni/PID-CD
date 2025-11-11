@@ -191,9 +191,9 @@ def walidacja_rozszerzona(
             
             if pass_gates:
                 pass_count += 1
-                print(f"    ✅ PASS - IAE={metryki['IAE']:.2f}, Mp={metryki['przeregulowanie']:.1f}%, ts={metryki['czas_ustalania']:.1f}s")
+                print(f"    [OK] PASS - IAE={metryki['IAE']:.2f}, Mp={metryki['przeregulowanie']:.1f}%, ts={metryki['czas_ustalania']:.1f}s")
             else:
-                print(f"    ❌ FAIL - {', '.join(powod)}")
+                print(f"    [X] FAIL - {', '.join(powod)}")
             
             wynik_scenariusza = {
                 'scenariusz': nazwa_scenariusza,
@@ -210,7 +210,7 @@ def walidacja_rozszerzona(
             wyniki_wszystkie_scenariusze.append(wynik_scenariusza)
             
         except Exception as e:
-            print(f"    ⚠️ Błąd podczas symulacji: {e}")
+            print(f"    [UWAGA] Błąd podczas symulacji: {e}")
             wyniki_wszystkie_scenariusze.append({
                 'scenariusz': nazwa_scenariusza,
                 'typ': scenariusz['typ'],
@@ -221,7 +221,7 @@ def walidacja_rozszerzona(
     
     # Podsumowanie
     procent_pass = (pass_count / len(scenariusze)) * 100
-    print(f"\n  📊 Wynik końcowy: {pass_count}/{len(scenariusze)} scenariuszy zaliczonych ({procent_pass:.1f}%)")
+    print(f"\n  [ANALIZA] Wynik końcowy: {pass_count}/{len(scenariusze)} scenariuszy zaliczonych ({procent_pass:.1f}%)")
     
     # Generuj wykres porównawczy
     _generuj_wykres_scenariusze(wyniki_wszystkie_scenariusze, regulator_nazwa, metoda, model_nazwa, katalog_wyniki)
@@ -253,7 +253,7 @@ def walidacja_rozszerzona(
     with open(raport_path, 'w', encoding='utf-8') as f:
         json.dump(raport, f, indent=2)
     
-    print(f"  💾 Zapisano raport: {raport_path}")
+    print(f"   Zapisano raport: {raport_path}")
     
     return raport
 
@@ -271,7 +271,7 @@ def _generuj_wykres_scenariusze(
     wyniki_z_danymi = [w for w in wyniki if w.get('t') is not None]
     
     if not wyniki_z_danymi:
-        print("  ⚠️ Brak danych do wygenerowania wykresu")
+        print("  [UWAGA] Brak danych do wygenerowania wykresu")
         return
     
     n_scenariuszy = len(wyniki_z_danymi)
@@ -294,7 +294,7 @@ def _generuj_wykres_scenariusze(
         ax_y.grid(True, alpha=0.3)
         ax_y.legend(loc='best')
         
-        status = "✅ PASS" if wynik['pass'] else "❌ FAIL"
+        status = "[OK] PASS" if wynik['pass'] else "[X] FAIL"
         ax_y.set_title(f"{wynik['scenariusz']} - {status}", fontweight='bold')
         
         # Wykres sterowania
@@ -318,7 +318,7 @@ def _generuj_wykres_scenariusze(
     plt.savefig(wykres_path, dpi=150, bbox_inches='tight')
     plt.close()
     
-    print(f"  📊 Zapisano wykres: {wykres_path}")
+    print(f"  [ANALIZA] Zapisano wykres: {wykres_path}")
 
 
 if __name__ == "__main__":

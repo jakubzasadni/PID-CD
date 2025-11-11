@@ -44,14 +44,14 @@ def wczytaj_wyniki_strojenia(regulator: str, model: str, katalog_wyniki="wyniki"
                     wynik['parametry'] = data.get('parametry', {})
                     wynik['dostepny'] = True
             except Exception as e:
-                print(f"⚠️ Błąd wczytywania {json_path}: {e}")
+                print(f"[UWAGA] Błąd wczytywania {json_path}: {e}")
         
         if os.path.exists(raport_path):
             try:
                 with open(raport_path, 'r', encoding='utf-8') as f:
                     wynik['raport'] = json.load(f)
             except Exception as e:
-                print(f"⚠️ Błąd wczytywania {raport_path}: {e}")
+                print(f"[UWAGA] Błąd wczytywania {raport_path}: {e}")
         
         wyniki[metoda] = wynik
     
@@ -67,14 +67,14 @@ def generuj_raport_porownawczy(regulator: str, model: str, katalog_wyniki="wynik
         model: Nazwa modelu (np. 'zbiornik_1rz')
         katalog_wyniki: Katalog z wynikami
     """
-    print(f"\n📊 Generowanie raportu porównawczego dla {regulator} na modelu {model}...")
+    print(f"\n[ANALIZA] Generowanie raportu porównawczego dla {regulator} na modelu {model}...")
     
     wyniki = wczytaj_wyniki_strojenia(regulator, model, katalog_wyniki)
     
     # Sprawdź czy są jakiekolwiek wyniki
     dostepne_metody = [m for m, w in wyniki.items() if w['dostepny']]
     if not dostepne_metody:
-        print(f"⚠️ Brak dostępnych wyników dla {regulator} na modelu {model}")
+        print(f"[UWAGA] Brak dostępnych wyników dla {regulator} na modelu {model}")
         return
     
     print(f"  Znaleziono wyniki dla metod: {', '.join(dostepne_metody)}")
@@ -105,7 +105,7 @@ def generuj_raport_porownawczy(regulator: str, model: str, katalog_wyniki="wynik
     </style>
     """)
     html_content.append("</head><body><div class='container'>")
-    html_content.append(f"<h1>📊 Raport Porównawczy Metod Strojenia</h1>")
+    html_content.append(f"<h1>[ANALIZA] Raport Porównawczy Metod Strojenia</h1>")
     html_content.append(f"<div class='info-box'>")
     html_content.append(f"<strong>Regulator:</strong> {regulator}<br>")
     html_content.append(f"<strong>Model:</strong> {model}<br>")
@@ -113,7 +113,7 @@ def generuj_raport_porownawczy(regulator: str, model: str, katalog_wyniki="wynik
     html_content.append(f"</div>")
     
     # === TABELA PARAMETRÓW ===
-    html_content.append("<h2>🔧 Porównanie Parametrów</h2>")
+    html_content.append("<h2> Porównanie Parametrów</h2>")
     html_content.append("<table>")
     html_content.append("<tr><th>Metoda</th><th>Kp</th><th>Ti</th><th>Td</th></tr>")
     
@@ -134,7 +134,7 @@ def generuj_raport_porownawczy(regulator: str, model: str, katalog_wyniki="wynik
     raporty_dostepne = [m for m, w in wyniki.items() if w['raport'] is not None]
     
     if raporty_dostepne:
-        html_content.append("<h2>📈 Porównanie Metryk Jakości</h2>")
+        html_content.append("<h2>[WYKRESY] Porównanie Metryk Jakości</h2>")
         html_content.append("<table>")
         html_content.append("<tr><th>Metoda</th><th>IAE</th><th>ISE</th><th>ITAE</th><th>Przeregulowanie [%]</th><th>Czas ustalania [s]</th><th>Czas narastania [s]</th></tr>")
         
@@ -170,7 +170,7 @@ def generuj_raport_porownawczy(regulator: str, model: str, katalog_wyniki="wynik
         
         html_content.append("</table>")
         html_content.append("<div class='info-box'>")
-        html_content.append("💡 <strong>Najlepsze wartości</strong> dla każdej metryki są podświetlone na zielono.")
+        html_content.append(" <strong>Najlepsze wartości</strong> dla każdej metryki są podświetlone na zielono.")
         html_content.append("</div>")
     
     # === WYKRESY PORÓWNAWCZE ===
@@ -255,11 +255,11 @@ def generuj_raport_porownawczy(regulator: str, model: str, katalog_wyniki="wynik
         plt.close()
         
         html_content.append(f"<img src='porownanie_{regulator}_{model}.{config_raport['format_wykresow']}' alt='Wykresy porównawcze'>")
-        print(f"  ✅ Zapisano wykresy: {wykres_path}")
+        print(f"  [OK] Zapisano wykresy: {wykres_path}")
     
     # === WNIOSKI ===
     if raporty_dostepne:
-        html_content.append("<h2>📝 Wnioski</h2>")
+        html_content.append("<h2> Wnioski</h2>")
         
         # Znajdź najlepszą metodę wg IAE
         najlepsza_metoda = min(raporty_dostepne, 
@@ -287,7 +287,7 @@ def generuj_raport_porownawczy(regulator: str, model: str, katalog_wyniki="wynik
     with open(html_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(html_content))
     
-    print(f"✅ Zapisano raport porównawczy: {html_path}")
+    print(f"[OK] Zapisano raport porównawczy: {html_path}")
     return html_path
 
 

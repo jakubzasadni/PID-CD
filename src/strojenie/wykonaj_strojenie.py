@@ -107,7 +107,7 @@ def _uruchom_symulacje_testowa(RegulatorClass, parametry: dict, model_nazwa: str
             import logging
             logging.exception(f"Błąd symulacji podczas strojenia: {e}")
         except Exception:
-            print(f"⚠️ Błąd symulacji: {e}")
+            print(f"[UWAGA] Błąd symulacji: {e}")
         class DummyMetryki:
             IAE = 999999
             przeregulowanie = 999
@@ -199,7 +199,7 @@ def _zapisz_raport_html(meta, parametry, historia=None, out_dir="wyniki"):
 
         f.write("</body></html>")
 
-    print(f"✅ Zapisano raport HTML: {html_path}")
+    print(f"[OK] Zapisano raport HTML: {html_path}")
     return html_path
 
 
@@ -223,7 +223,7 @@ def wykonaj_strojenie(metoda="ziegler_nichols", model_nazwa="zbiornik_1rz"):
 
     regulator_nazwa = os.getenv("REGULATOR", "regulator_pid").lower()
     print(f"\n{'='*60}")
-    print(f"⚙️ Strojenie: {regulator_nazwa} | metoda: {metoda} | model: {model_nazwa}")
+    print(f"[STROJENIE] Strojenie: {regulator_nazwa} | metoda: {metoda} | model: {model_nazwa}")
     print(f"{'='*60}")
     
     # Konfiguruj logowanie
@@ -273,7 +273,7 @@ def wykonaj_strojenie(metoda="ziegler_nichols", model_nazwa="zbiornik_1rz"):
             try:
                 from src.strojenie.ziegler_nichols import strojenie_ZN
                 params_zn = strojenie_ZN(RegulatorClass, model_nazwa, regulator_nazwa)
-                print(f"ℹ️ Użyję parametrów ZN jako punktu startowego: {params_zn}")
+                print(f"[INFO] Użyję parametrów ZN jako punktu startowego: {params_zn}")
             except Exception as e:
                 logging.warning(f"Nie udało się uzyskać parametrów ZN: {e}")
                 params_zn = None
@@ -282,7 +282,7 @@ def wykonaj_strojenie(metoda="ziegler_nichols", model_nazwa="zbiornik_1rz"):
                                                   _uruchom_symulacje_testowa, params_zn)
 
     else:
-        raise ValueError(f"❌ Nieznana metoda strojenia: {metoda}")
+        raise ValueError(f"[X] Nieznana metoda strojenia: {metoda}")
 
     czas_obliczen_s = time.time() - start_time
 
@@ -296,7 +296,7 @@ def wykonaj_strojenie(metoda="ziegler_nichols", model_nazwa="zbiornik_1rz"):
     json_path = os.path.join(out_dir, f"parametry_{regulator_nazwa}_{metoda}.json")
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2)
-    print(f"💾 Zapisano parametry: {json_path}")
+    print(f" Zapisano parametry: {json_path}")
 
     _zapisz_raport_html(meta, params, historia, out_dir)
     return params

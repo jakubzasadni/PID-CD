@@ -10,13 +10,13 @@ def wyswietl_dashboard():
     """Wyświetla dashboard z podsumowaniem projektu."""
     
     print("\n" + "="*80)
-    print(" "*25 + "🎓 DASHBOARD PROJEKTU INŻYNIERSKIEGO")
+    print(" "*25 + " DASHBOARD PROJEKTU INŻYNIERSKIEGO")
     print("="*80)
     print(f"\n📅 Data: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     
     # 1. Statystyki raportów walidacji
     print("━"*80)
-    print("📊 STATYSTYKI WALIDACJI")
+    print("[ANALIZA] STATYSTYKI WALIDACJI")
     print("━"*80)
     
     wyniki_dir = Path("wyniki")
@@ -56,8 +56,8 @@ def wyswietl_dashboard():
         pass_rate = (pass_count / total * 100) if total > 0 else 0
         
         print(f"  Całkowita liczba testów: {total}")
-        print(f"  ✅ Przeszło: {pass_count} ({pass_rate:.1f}%)")
-        print(f"  ❌ Nie przeszło: {fail_count}")
+        print(f"  [OK] Przeszło: {pass_count} ({pass_rate:.1f}%)")
+        print(f"  [X] Nie przeszło: {fail_count}")
         print()
         
         # Statystyki per regulator
@@ -67,11 +67,11 @@ def wyswietl_dashboard():
             pass_rate_reg = (stats["pass"] / total_reg * 100) if total_reg > 0 else 0
             print(f"    • {reg:20} → {stats['pass']}/{total_reg} ({pass_rate_reg:.0f}%)")
     else:
-        print("  ⚠️ Brak raportów walidacji")
+        print("  [UWAGA] Brak raportów walidacji")
     
     # 2. Najnowszy raport końcowy
     print("\n" + "━"*80)
-    print("📈 OSTATNI RAPORT KOŃCOWY")
+    print("[WYKRESY] OSTATNI RAPORT KOŃCOWY")
     print("━"*80)
     
     raporty_koncowe = sorted(wyniki_dir.glob("raport_koncowy_*/raport_koncowy.html"))
@@ -88,15 +88,15 @@ def wyswietl_dashboard():
             if file.suffix == ".html":
                 print(f"    📄 {file.name:35} ({size_kb:.1f} KB) ⭐ OTWÓRZ W PRZEGLĄDARCE")
             elif file.suffix == ".csv":
-                print(f"    📊 {file.name:35} ({size_kb:.1f} KB)")
+                print(f"    [ANALIZA] {file.name:35} ({size_kb:.1f} KB)")
             elif file.suffix == ".png":
                 print(f"    🖼️ {file.name:35} ({size_kb:.1f} KB)")
     else:
-        print("  ⚠️ Brak raportu końcowego - uruchom: python src/raport_koncowy.py")
+        print("  [UWAGA] Brak raportu końcowego - uruchom: python src/raport_koncowy.py")
     
     # 3. Metryki CI/CD
     print("\n" + "━"*80)
-    print("⏱️ METRYKI CI/CD PIPELINE")
+    print("[CZAS] METRYKI CI/CD PIPELINE")
     print("━"*80)
     
     metryki_file = wyniki_dir / "pipeline_metrics.json"
@@ -106,14 +106,14 @@ def wyswietl_dashboard():
         
         total_time = metryki.get("total_time_s", 0)
         status = metryki.get("status", "unknown")
-        status_emoji = "✅" if status == "success" else "❌"
+        status_emoji = "[OK]" if status == "success" else "[X]"
         
         print(f"  Status ostatniego run: {status_emoji} {status.upper()}")
         print(f"  Całkowity czas: {total_time:.1f}s (~{total_time/60:.1f} min)")
         print(f"  Etapy:")
         
         for etap, dane in metryki.get("etapy", {}).items():
-            status_e = "✅" if dane["status"] == "success" else "❌"
+            status_e = "[OK]" if dane["status"] == "success" else "[X]"
             print(f"    {status_e} {etap:30} → {dane['czas_s']:.2f}s")
         
         # Historia
@@ -129,11 +129,11 @@ def wyswietl_dashboard():
             print(f"\n  Historia ({len(historia)} uruchomień):")
             print(f"    Success rate: {success_rate:.1f}% ({success_runs}/{total_runs})")
     else:
-        print("  ⚠️ Brak metryk - uruchom pipeline z pomiarem czasu")
+        print("  [UWAGA] Brak metryk - uruchom pipeline z pomiarem czasu")
     
     # 4. Ostatnie wdrożenie
     print("\n" + "━"*80)
-    print("🚀 OSTATNIE WDROŻENIE GITOPS")
+    print("[START] OSTATNIE WDROŻENIE GITOPS")
     print("━"*80)
     
     wdrozenie_file = wyniki_dir / "OSTATNIE_WDROZENIE.md"
@@ -150,15 +150,15 @@ def wyswietl_dashboard():
                 break
         
         # Policz wdrożone modele
-        deployed_count = sum(1 for line in lines if "✅ DEPLOYED" in line)
+        deployed_count = sum(1 for line in lines if "[OK] DEPLOYED" in line)
         print(f"  Wdrożone modele: {deployed_count}/3")
         print(f"  Szczegóły: wyniki/OSTATNIE_WDROZENIE.md")
     else:
-        print("  ⚠️ Brak wdrożenia - uruchom: python src/wdrozenie_gitops.py")
+        print("  [UWAGA] Brak wdrożenia - uruchom: python src/wdrozenie_gitops.py")
     
     # 5. Quick actions
     print("\n" + "━"*80)
-    print("🎯 SZYBKIE AKCJE")
+    print(" SZYBKIE AKCJE")
     print("━"*80)
     print("""
   1. Wygeneruj raport końcowy:
@@ -178,7 +178,7 @@ def wyswietl_dashboard():
 """)
     
     print("="*80)
-    print(" "*20 + "🎓 Powodzenia z pracą inżynierską! 🚀")
+    print(" "*20 + " Powodzenia z pracą inżynierską! [START]")
     print("="*80 + "\n")
 
 
@@ -186,6 +186,6 @@ if __name__ == "__main__":
     try:
         wyswietl_dashboard()
     except Exception as e:
-        print(f"\n❌ Błąd: {e}")
+        print(f"\n[X] Błąd: {e}")
         import traceback
         traceback.print_exc()

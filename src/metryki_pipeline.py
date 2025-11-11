@@ -28,7 +28,7 @@ class MetrykiPipeline:
     @contextmanager
     def zmierz_etap(self, nazwa_etapu: str):
         """Context manager do pomiaru czasu etapu pipeline."""
-        print(f"\n⏱️ START: {nazwa_etapu}")
+        print(f"\n[CZAS] START: {nazwa_etapu}")
         start = time.time()
         
         try:
@@ -39,7 +39,7 @@ class MetrykiPipeline:
                 "status": "success",
                 "koniec": datetime.now().isoformat()
             }
-            print(f"✅ KONIEC: {nazwa_etapu} ({czas:.2f}s)")
+            print(f"[OK] KONIEC: {nazwa_etapu} ({czas:.2f}s)")
             
         except Exception as e:
             czas = time.time() - start
@@ -49,7 +49,7 @@ class MetrykiPipeline:
                 "error": str(e),
                 "koniec": datetime.now().isoformat()
             }
-            print(f"❌ BŁĄD: {nazwa_etapu} ({czas:.2f}s) - {e}")
+            print(f"[X] BŁĄD: {nazwa_etapu} ({czas:.2f}s) - {e}")
             raise
     
     def zakoncz_run(self, status: str = "success"):
@@ -71,13 +71,13 @@ class MetrykiPipeline:
         self._dodaj_do_historii()
         
         print(f"\n{'='*70}")
-        print(f"📊 METRYKI PIPELINE")
+        print(f"[ANALIZA] METRYKI PIPELINE")
         print(f"{'='*70}")
         print(f"Status: {status.upper()}")
         print(f"Całkowity czas: {total_time:.2f}s ({timedelta(seconds=int(total_time))})")
         print(f"\nCzasy etapów:")
         for etap, dane in self.current_run["etapy"].items():
-            status_emoji = "✅" if dane["status"] == "success" else "❌"
+            status_emoji = "[OK]" if dane["status"] == "success" else "[X]"
             print(f"  {status_emoji} {etap}: {dane['czas_s']}s")
         print(f"{'='*70}\n")
     
@@ -172,7 +172,7 @@ class MetrykiPipeline:
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(svg)
         
-        print(f"✅ Badge zapisany: {output_file}")
+        print(f"[OK] Badge zapisany: {output_file}")
         return output_file
     
     def generuj_raport_markdown(self, output_file: str = None):
@@ -183,11 +183,11 @@ class MetrykiPipeline:
         stats = self.pobierz_statystyki()
         
         if not stats:
-            print("⚠️ Brak danych do wygenerowania raportu")
+            print("[UWAGA] Brak danych do wygenerowania raportu")
             return
         
         md = []
-        md.append("# 📊 Wyniki eksperymentów CI/CD\n")
+        md.append("# Wyniki eksperymentów CI/CD\n")
         md.append(f"**Ostatnia aktualizacja:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         
         # Badge
@@ -204,7 +204,7 @@ class MetrykiPipeline:
         
         # Ostatni run
         last_run = stats["last_run"]
-        status_emoji = "✅" if last_run["status"] == "success" else "❌"
+        status_emoji = "[OK]" if last_run["status"] == "success" else "[X]"
         
         md.append("## Ostatnie uruchomienie\n")
         md.append(f"- **Status:** {status_emoji} {last_run['status'].upper()}\n")
@@ -216,7 +216,7 @@ class MetrykiPipeline:
         md.append("|------|------|--------|\n")
         
         for etap, dane in last_run.get("etapy", {}).items():
-            status_emoji = "✅" if dane["status"] == "success" else "❌"
+            status_emoji = "[OK]" if dane["status"] == "success" else "[X]"
             md.append(f"| {etap} | {dane['czas_s']}s | {status_emoji} {dane['status']} |\n")
         
         md.append("\n")
@@ -232,10 +232,10 @@ class MetrykiPipeline:
         savings_percent = (savings / manual_time * 100) if manual_time > 0 else 0
         
         md.append(f"| Czas (godz) | ~{manual_time/60:.1f}h | ~{auto_time/60:.1f}h | {savings/60:.1f}h ({savings_percent:.0f}%) |\n")
-        md.append(f"| Powtarzalność | Niska | Wysoka | ✅ |\n")
-        md.append(f"| Błądy ludzkie | Możliwe | Wyeliminowane | ✅ |\n")
-        md.append(f"| Dokumentacja | Manualna | Automatyczna | ✅ |\n")
-        md.append(f"| Wdrożenie | Manualne | Automatyczne (GitOps) | ✅ |\n\n")
+        md.append(f"| Powtarzalność | Niska | Wysoka | [OK] |\n")
+        md.append(f"| Błądy ludzkie | Możliwe | Wyeliminowane | [OK] |\n")
+        md.append(f"| Dokumentacja | Manualna | Automatyczna | [OK] |\n")
+        md.append(f"| Wdrożenie | Manualne | Automatyczne (GitOps) | [OK] |\n\n")
         
         # Historia ostatnich 10 runów
         if self.historia_file.exists():
@@ -247,7 +247,7 @@ class MetrykiPipeline:
             md.append("|---|------|--------|------|----------|\n")
             
             for i, run in enumerate(reversed(historia[-10:]), 1):
-                status_emoji = "✅" if run["status"] == "success" else "❌"
+                status_emoji = "[OK]" if run["status"] == "success" else "[X]"
                 total_time = run.get("total_time_s", 0)
                 etapy_ok = sum(1 for e in run.get("etapy", {}).values() if e["status"] == "success")
                 etapy_total = len(run.get("etapy", {}))
@@ -261,7 +261,7 @@ class MetrykiPipeline:
         with open(output_file, "w", encoding="utf-8") as f:
             f.write("".join(md))
         
-        print(f"✅ Raport markdown zapisany: {output_file}")
+        print(f"[OK] Raport markdown zapisany: {output_file}")
         return output_file
 
 
@@ -292,7 +292,7 @@ def main():
     
     # Wyświetl statystyki
     stats = metryki.pobierz_statystyki()
-    print(f"\n📊 Statystyki: {json.dumps(stats, indent=2, ensure_ascii=False)}")
+    print(f"\n[ANALIZA] Statystyki: {json.dumps(stats, indent=2, ensure_ascii=False)}")
 
 
 if __name__ == "__main__":

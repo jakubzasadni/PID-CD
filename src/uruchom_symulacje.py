@@ -48,15 +48,15 @@ def uruchom_symulacje():
     }
     modele = [model_env] if model_env else list(progi_modele.keys())
 
-    print(f"🔧 Wybrany regulator (env): {regulator_env}")
+    print(f" Wybrany regulator (env): {regulator_env}")
     print("🧱 Modele procesów:", ", ".join(modele))
     print("--------------------------------------------------")
 
     # -----------------------------------------------------
-    # 1️⃣ Tryb strojenia
+    # [1] Tryb strojenia
     # -----------------------------------------------------
     if tryb == "strojenie":
-        print("⚙️ [1/3] Strojenie metodami klasycznymi i optymalizacyjnymi...")
+        print("[STROJENIE] [1/3] Strojenie metodami klasycznymi i optymalizacyjnymi...")
 
         # --- Obsługa trybu ALL (dla wszystkich regulatorów) ---
         if regulator_env.lower() == "all":
@@ -70,24 +70,24 @@ def uruchom_symulacje():
             
             # Stroij na każdym modelu osobno
             for model_nazwa in modele:
-                print(f"\n⚙️ Strojenie regulatora: {regulator_nazwa} na modelu {model_nazwa}")
+                print(f"\n[STROJENIE] Strojenie regulatora: {regulator_nazwa} na modelu {model_nazwa}")
                 for metoda in ["ziegler_nichols", "siatka", "optymalizacja"]:
-                    print(f"  📊 Metoda: {metoda.replace('_', ' ').title()}...")
+                    print(f"  [ANALIZA] Metoda: {metoda.replace('_', ' ').title()}...")
                     try:
                         wykonaj_strojenie(metoda, model_nazwa=model_nazwa)
                     except Exception as e:
-                        print(f"  ❌ Błąd podczas strojenia: {e}")
+                        print(f"  [X] Błąd podczas strojenia: {e}")
 
-        print("✅ Zakończono strojenie wszystkich regulatorów i metod.")
+        print("[OK] Zakończono strojenie wszystkich regulatorów i metod.")
         return
 
     # -----------------------------------------------------
-    # 2️⃣ Tryb walidacji
+    # [2] Tryb walidacji
     # -----------------------------------------------------
     elif tryb == "walidacja":
         pliki_params = [f for f in os.listdir(out_dir) if f.startswith("parametry_") and f.endswith(".json")]
         if not pliki_params:
-            print("⚠️ Brak plików parametrów w katalogu:", out_dir)
+            print("[UWAGA] Brak plików parametrów w katalogu:", out_dir)
             return
 
         # --- Wybór zbioru regulatorów ---
@@ -97,7 +97,7 @@ def uruchom_symulacje():
             regulator_files = [p for p in pliki_params if f"parametry_{regulator_env}_" in p]
 
         if not regulator_files:
-            print("⚠️ Nie znaleziono parametrów dla wskazanego REGULATOR:", regulator_env)
+            print("[UWAGA] Nie znaleziono parametrów dla wskazanego REGULATOR:", regulator_env)
             return
 
         pass_count = 0
@@ -114,7 +114,7 @@ def uruchom_symulacje():
             for model_nazwa in modele:
                 total_count += 1
                 prog = progi_modele[model_nazwa]
-                print(f"\n🔍 [{regulator_nazwa} | {metoda}] model {model_nazwa}")
+                print(f"\n[SZUKANIE] [{regulator_nazwa} | {metoda}] model {model_nazwa}")
                 print(f"📏 Progi: ts ≤ {prog['ts']}s, IAE ≤ {prog['IAE']}, Mp ≤ {prog['Mp']}%")
 
                 Model = dynamiczny_import("modele", model_nazwa)
@@ -207,7 +207,7 @@ def uruchom_symulacje():
                           dpi=150, bbox_inches='tight')
                 plt.close()
 
-                status = "✅" if pass_gates else "❌"
+                status = "[OK]" if pass_gates else "[X]"
                 if pass_gates:
                     pass_count += 1
                     print(f"{status} Wyniki:")
@@ -217,10 +217,10 @@ def uruchom_symulacje():
                     print(f"{status} Wyniki:")
                     print(f"  • IAE={wyniki.IAE:.2f}, ITAE={wyniki.ITAE:.2f}")
                     print(f"  • Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s, tr={wyniki.czas_narastania:.1f}s")
-                    print(f"  ❌ Niezaliczone kryteria: {', '.join(powod)}")
+                    print(f"  [X] Niezaliczone kryteria: {', '.join(powod)}")
 
         print("\n--------------------------------------------------")
-        print(f"📊 Łącznie PASS: {pass_count}/{total_count} ({100*pass_count/total_count:.1f}%)")
+        print(f"[ANALIZA] Łącznie PASS: {pass_count}/{total_count} ({100*pass_count/total_count:.1f}%)")
 
         # === ROZSZERZONA WALIDACJA (opcjonalna) ===
         try:
@@ -252,17 +252,17 @@ def uruchom_symulacje():
                     if (regulator_nazwa, metoda, model_nazwa) in passed_keys:
                         walidacja_rozszerzona(regulator_nazwa, metoda, model_nazwa, parametry, out_dir)
                     else:
-                        print(f"  ⏭️ Pomijam rozszerzoną walidację dla {regulator_nazwa} / {metoda} / {model_nazwa} (FAIL w podstawowej walidacji)")
+                        print(f"  [SKIP] Pomijam rozszerzoną walidację dla {regulator_nazwa} / {metoda} / {model_nazwa} (FAIL w podstawowej walidacji)")
 
         except Exception as e:
-            print(f"⚠️ Rozszerzona walidacja nie powiodła się: {e}")
+            print(f"[UWAGA] Rozszerzona walidacja nie powiodła się: {e}")
 
         # === RAPORTY PORÓWNAWCZE ===
         try:
             from src.strojenie.raport_porownawczy import generuj_raport_porownawczy
 
             print("\n" + "="*60)
-            print("📊 Generuję raporty porównawcze...")
+            print("[ANALIZA] Generuję raporty porównawcze...")
             print("="*60)
 
             # Dla każdego regulatora i modelu
@@ -277,22 +277,22 @@ def uruchom_symulacje():
                     try:
                         generuj_raport_porownawczy(regulator, model, out_dir)
                     except Exception as e:
-                        print(f"⚠️ Nie udało się wygenerować raportu dla {regulator}/{model}: {e}")
+                        print(f"[UWAGA] Nie udało się wygenerować raportu dla {regulator}/{model}: {e}")
 
         except Exception as e:
-            print(f"⚠️ Generowanie raportów porównawczych nie powiodło się: {e}")
+            print(f"[UWAGA] Generowanie raportów porównawczych nie powiodło się: {e}")
 
         if pass_count == 0:
-            print("\n❌ Żaden regulator nie spełnił progów jakości.")
+            print("\n[X] Żaden regulator nie spełnił progów jakości.")
             exit(1)
-        print("\n✅ Walidacja zakończona.")
+        print("\n[OK] Walidacja zakończona.")
         return
 
     # -----------------------------------------------------
-    # 3️⃣ Inny tryb (błąd)
+    # [3] Inny tryb (błąd)
     # -----------------------------------------------------
     else:
-        print("❌ Nieznany tryb działania (TRYB=strojenie|walidacja)")
+        print("[X] Nieznany tryb działania (TRYB=strojenie|walidacja)")
 
 
 if __name__ == "__main__":

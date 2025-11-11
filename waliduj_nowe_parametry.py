@@ -39,7 +39,7 @@ def waliduj_regulator(Regulator, params, nazwa):
     print(f"\n{nazwa}:")
     print(f"  Parametry: {params}")
     print(f"  IAE={metryki.IAE:.2f}, Mp={metryki.przeregulowanie:.1f}%, ts={metryki.czas_ustalania:.1f}s")
-    print(f"  Status: {'✅ PASS' if PASS else '❌ FAIL'}")
+    print(f"  Status: {'[OK] PASS' if PASS else '[X] FAIL'}")
     if not PASS:
         problemy = []
         if metryki.przeregulowanie > 20.0:

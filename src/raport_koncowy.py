@@ -31,7 +31,7 @@ class GeneratorRaportuKoncowego:
         
     def zbierz_dane(self):
         """Zbiera wszystkie raporty walidacji z katalogu wyników."""
-        print("📂 Zbieranie danych z raportów walidacji...")
+        print(" Zbieranie danych z raportów walidacji...")
         
         # Szukaj w głównym folderze i podfolderach
         for pattern in ["raport_*.json", "*/raport_*.json"]:
@@ -69,14 +69,14 @@ class GeneratorRaportuKoncowego:
                         "plik": plik.name
                     })
                 except Exception as e:
-                    print(f"⚠️ Błąd przy czytaniu {plik.name}: {e}")
+                    print(f"[UWAGA] Błąd przy czytaniu {plik.name}: {e}")
         
-        print(f"✅ Zebrano {len(self.dane)} raportów walidacji")
+        print(f"[OK] Zebrano {len(self.dane)} raportów walidacji")
         return pd.DataFrame(self.dane)
     
     def analiza_statystyczna(self, df):
         """Wykonuje analizę statystyczną metod strojenia."""
-        print("\n📊 Analiza statystyczna metod...")
+        print("\n[ANALIZA] Analiza statystyczna metod...")
         
         wyniki = {}
         
@@ -120,7 +120,7 @@ class GeneratorRaportuKoncowego:
             html.append("<table border='1' style='border-collapse: collapse; width: 100%;'>")
             html.append("<tr style='background-color: #4CAF50; color: white;'>")
             html.append("<th>Metoda</th><th>Pass Rate</th><th>IAE (śr±std)</th>")
-            html.append("<th>Mp% (śr±std)</th><th>ts (śr)</th><th>Czas obliczeń (s)</th></tr>")
+            html.append("<th>Mp% (śr±std)</th><th>ts (śr)</th></tr>")
             
             for metoda in self.metody:
                 if metoda not in wyniki_stats[model]:
@@ -165,12 +165,6 @@ class GeneratorRaportuKoncowego:
                 else:
                     html.append("<td>-</td>")
                 
-                # Czas obliczeń
-                if stats["czas_obliczen_mean"] is not None:
-                    html.append(f"<td>{stats['czas_obliczen_mean']:.2f}s</td>")
-                else:
-                    html.append("<td>-</td>")
-                
                 html.append("</tr>")
             
             html.append("</table><br>")
@@ -179,7 +173,7 @@ class GeneratorRaportuKoncowego:
     
     def utworz_wykresy(self, df, output_dir):
         """Tworzy wykresy porównawcze metod."""
-        print("\n📈 Generowanie wykresów porównawczych...")
+        print("\n[WYKRESY] Generowanie wykresów porównawczych...")
         
         output_dir = Path(output_dir)
         output_dir.mkdir(exist_ok=True)
@@ -241,7 +235,7 @@ class GeneratorRaportuKoncowego:
         ax.set_xticklabels(labels, rotation=45, ha='right')
         ax.set_ylabel('Pass Rate (%)')
         ax.set_title('Pass Rate dla wszystkich kombinacji Model + Metoda', fontweight='bold')
-        ax.axhline(y=100, color='green', linestyle='--', alpha=0.3, label='100% (ideal)')
+        ax.axhline(y=100, color='green', linestyle='--', alpha=0.3, label='100% (idealny)')
         ax.axhline(y=75, color='orange', linestyle='--', alpha=0.3, label='75% (dobry)')
         ax.legend()
         ax.set_ylim(0, 105)
@@ -256,27 +250,7 @@ class GeneratorRaportuKoncowego:
         plt.savefig(output_dir / "porownanie_pass_rate.png", dpi=300, bbox_inches='tight')
         plt.close()
         
-        # 3. Heatmap czasu obliczeń
-        fig, ax = plt.subplots(figsize=(10, 6))
-        
-        # Pivot table dla czasu obliczeń
-        df_czas = df[df["czas_obliczen"].notna()].copy()
-        if not df_czas.empty:
-            pivot = df_czas.pivot_table(values='czas_obliczen', 
-                                        index='metoda', 
-                                        columns='model', 
-                                        aggfunc='mean')
-            
-            sns.heatmap(pivot, annot=True, fmt='.1f', cmap='YlOrRd', ax=ax, cbar_kws={'label': 'Czas (s)'})
-            ax.set_title('Średni czas obliczeń (s) - Metoda vs Model', fontweight='bold')
-            ax.set_xlabel('Model')
-            ax.set_ylabel('Metoda strojenia')
-            
-            plt.tight_layout()
-            plt.savefig(output_dir / "porownanie_czas_obliczen.png", dpi=300, bbox_inches='tight')
-            plt.close()
-        
-        # 4. Scatter plot IAE vs Mp dla każdego modelu
+        # 3. Scatter plot IAE vs Mp dla każdego modelu
         fig, axes = plt.subplots(1, 3, figsize=(18, 5))
         fig.suptitle('IAE vs Przeregulowanie (Mp%) - trade-off', fontsize=16, fontweight='bold')
         
@@ -306,12 +280,12 @@ class GeneratorRaportuKoncowego:
         plt.savefig(output_dir / "porownanie_IAE_vs_Mp.png", dpi=300, bbox_inches='tight')
         plt.close()
         
-        print(f"✅ Wykresy zapisane w: {output_dir}")
+        print(f"[OK] Wykresy zapisane w: {output_dir}")
         return output_dir
     
     def ranking_metod(self, df):
         """Tworzy ranking metod na podstawie wielokryterialnej oceny."""
-        print("\n🏆 Tworzenie rankingu metod...")
+        print("\n[RANKING] Tworzenie rankingu metod...")
         
         ranking = []
         
@@ -432,8 +406,15 @@ class GeneratorRaportuKoncowego:
         html.append("</style></head><body>")
         
         # Nagłówek
-        html.append("<h1>📊 Raport końcowy - Porównanie metod strojenia regulatorów</h1>")
+        html.append("<h1>Raport końcowy - Porównanie metod strojenia regulatorów</h1>")
         html.append(f"<p><i>Wygenerowano: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</i></p>")
+        
+        # Pokaż które regulatory są w raporcie
+        regulatory_w_raporcie = df["regulator"].unique().tolist() if "regulator" in df.columns else []
+        if regulatory_w_raporcie:
+            regulatory_str = ", ".join([r.replace("regulator_", "").upper() for r in regulatory_w_raporcie])
+            html.append(f"<p><b>Testowane regulatory:</b> {regulatory_str}</p>")
+        
         html.append(f"<p><b>Liczba analizowanych wyników:</b> {len(df)}</p>")
         
         # Sekcja 1: Podsumowanie
@@ -483,7 +464,6 @@ class GeneratorRaportuKoncowego:
         wykresy = [
             "porownanie_IAE_boxplot.png",
             "porownanie_pass_rate.png",
-            "porownanie_czas_obliczen.png",
             "porownanie_IAE_vs_Mp.png"
         ]
         
@@ -511,12 +491,12 @@ class GeneratorRaportuKoncowego:
         with open(output_file, "w", encoding="utf-8") as f:
             f.write("\n".join(html))
         
-        print(f"✅ Raport HTML zapisany: {output_file}")
+        print(f"[OK] Raport HTML zapisany: {output_file}")
     
     def eksportuj_csv(self, df, output_file):
         """Eksportuje dane do CSV."""
         df.to_csv(output_file, index=False, encoding="utf-8")
-        print(f"✅ Dane wyeksportowane do CSV: {output_file}")
+        print(f"[OK] Dane wyeksportowane do CSV: {output_file}")
     
     def generuj(self, output_dir: str = None):
         """Główna metoda generująca kompletny raport."""
@@ -528,14 +508,14 @@ class GeneratorRaportuKoncowego:
         output_dir.mkdir(exist_ok=True, parents=True)
         
         print("=" * 60)
-        print("🚀 GENERATOR RAPORTU KOŃCOWEGO")
+        print("[START] GENERATOR RAPORTU KOŃCOWEGO")
         print("=" * 60)
         
         # 1. Zbierz dane
         df = self.zbierz_dane()
         
         if df.empty:
-            print("❌ Brak danych do analizy!")
+            print("[X] Brak danych do analizy!")
             return
         
         # 2. Analiza statystyczna
@@ -555,9 +535,9 @@ class GeneratorRaportuKoncowego:
         self.eksportuj_csv(ranking_df, output_dir / "raport_koncowy_ranking.csv")
         
         print("\n" + "=" * 60)
-        print(f"✅ RAPORT KOŃCOWY WYGENEROWANY: {output_dir}")
+        print(f"[OK] RAPORT KOŃCOWY WYGENEROWANY: {output_dir}")
         print("=" * 60)
-        print(f"\n📂 Zawartość:")
+        print(f"\nZawartość:")
         print(f"  - raport_koncowy.html (raport główny)")
         print(f"  - raport_koncowy_dane.csv (wszystkie dane)")
         print(f"  - raport_koncowy_ranking.csv (ranking metod)")

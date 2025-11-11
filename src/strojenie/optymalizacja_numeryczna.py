@@ -84,7 +84,7 @@ def strojenie_optymalizacja(RegulatorClass, model_nazwa: str, typ_regulatora: st
     Returns:
         dict: {"Kp": ..., "Ti": ..., "Td": ...}
     """
-    print(f"\n🔍 Optymalizacja numeryczna dla {typ_regulatora} na modelu {model_nazwa}...")
+    print(f"\n[SZUKANIE] Optymalizacja numeryczna dla {typ_regulatora} na modelu {model_nazwa}...")
     
     # Wczytaj konfigurację
     config = pobierz_konfiguracje()
@@ -200,7 +200,7 @@ def strojenie_optymalizacja(RegulatorClass, model_nazwa: str, typ_regulatora: st
         print(f"  Punkt startowy {i+3}: Losowy {[f'{v:.2f}' for v in x0_losowy]}")
     
     # Uruchom optymalizację z każdego punktu startowego
-    print(f"\n🚀 Uruchamiam {len(punkty_startowe)} optymalizacji (metoda={metoda}, maxiter={maxiter})...\n")
+    print(f"\n[START] Uruchamiam {len(punkty_startowe)} optymalizacji (metoda={metoda}, maxiter={maxiter})...\n")
     
     wyniki = []
     wszystkie_historie = []
@@ -219,7 +219,7 @@ def strojenie_optymalizacja(RegulatorClass, model_nazwa: str, typ_regulatora: st
     
     # Wybierz najlepszy wynik
     if not wyniki:
-        print("⚠️ Żadna optymalizacja nie powiodła się! Używam wartości domyślnych.")
+        print("[UWAGA] Żadna optymalizacja nie powiodła się! Używam wartości domyślnych.")
         best_params = {
             "Kp": 1.0,
             "Ti": 10.0 if typ in ["regulator_pi", "regulator_pid"] else None,
@@ -235,14 +235,14 @@ def strojenie_optymalizacja(RegulatorClass, model_nazwa: str, typ_regulatora: st
     if "Td" not in best_params:
         best_params["Td"] = None
     
-    print(f"\n✅ Najlepszy wynik z punktu: {nazwa_najlepszego}")
+    print(f"\n[OK] Najlepszy wynik z punktu: {nazwa_najlepszego}")
     print(f"   Parametry: Kp={best_params['Kp']}, Ti={best_params['Ti']}, Td={best_params['Td']}")
     print(f"   Wartość funkcji celu: {best_val:.2f}")
     print(f"   Łącznie iteracji: {len(wszystkie_historie)}")
     
     # Porównaj wszystkie wyniki
     if len(wyniki) > 1:
-        print(f"\n📊 Porównanie wszystkich startów:")
+        print(f"\n[ANALIZA] Porównanie wszystkich startów:")
         for nazwa, params, val, _ in sorted(wyniki, key=lambda x: x[2]):
             print(f"     {nazwa:20s}: kara={val:.2f}")
     

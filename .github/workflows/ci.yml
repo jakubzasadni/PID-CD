@@ -31,7 +31,7 @@ jobs:
         run: |
           if [ "${{ github.event.inputs.regulator }}" = "all" ]; then
             for REG in regulator_p regulator_pi regulator_pd regulator_pid; do
-              echo "⚙️ Strojenie regulatora: $REG"
+              echo "[STROJENIE] Regulator: $REG"
               docker run --rm \
                 -e REGULATOR=$REG \
                 -e TRYB=strojenie \
@@ -75,7 +75,7 @@ jobs:
         run: |
           if [ "${{ github.event.inputs.regulator }}" = "all" ]; then
             for REG in regulator_p regulator_pi regulator_pd regulator_pid; do
-              echo "🧪 Walidacja $REG na modelu zbiornik_1rz"
+              echo "[WALIDACJA] $REG na modelu zbiornik_1rz"
               docker run --rm \
                 -e REGULATOR=$REG \
                 -e TRYB=walidacja \
@@ -114,7 +114,7 @@ jobs:
         run: |
           if [ "${{ github.event.inputs.regulator }}" = "all" ]; then
             for REG in regulator_p regulator_pi regulator_pd regulator_pid; do
-              echo "🧪 Walidacja $REG na modelu dwa_zbiorniki"
+              echo "[WALIDACJA] $REG na modelu dwa_zbiorniki"
               docker run --rm \
                 -e REGULATOR=$REG \
                 -e TRYB=walidacja \
@@ -133,7 +133,7 @@ jobs:
       - name: Upload partial results
         uses: actions/upload-artifact@v4
         with:
-          name: wyniki-dwa
+          name: wyniki-dwa-zbiorniki
           path: wyniki/
 
   validate_wahadlo:
@@ -153,7 +153,7 @@ jobs:
         run: |
           if [ "${{ github.event.inputs.regulator }}" = "all" ]; then
             for REG in regulator_p regulator_pi regulator_pd regulator_pid; do
-              echo "🧪 Walidacja $REG na modelu wahadlo_odwrocone"
+              echo "[WALIDACJA] $REG na modelu wahadlo_odwrocone"
               docker run --rm \
                 -e REGULATOR=$REG \
                 -e TRYB=walidacja \
@@ -208,36 +208,36 @@ jobs:
           docker run --rm \
             -e REGULATOR=${{ github.event.inputs.regulator }} \
             -v ${{ github.workspace }}/wyniki:/app/wyniki \
-            regulator-sim:test python src/ocena_metod.py || echo "⚠️ Brak raportów do oceny w katalogu: wyniki"
+            regulator-sim:test python src/ocena_metod.py || echo "[UWAGA] Brak raportow do oceny w katalogu: wyniki"
 
       - name: Generuj raport końcowy porównawczy (NEW v2.1)
         run: |
-          echo "📊 Generowanie raportu końcowego..."
+          echo "[ANALIZA] Generowanie raportu końcowego..."
           docker run --rm \
             -v ${{ github.workspace }}/wyniki:/app/wyniki \
-            regulator-sim:test python src/raport_koncowy.py --wyniki-dir /app/wyniki || echo "⚠️ Błąd przy generowaniu raportu końcowego"
+            regulator-sim:test python src/raport_koncowy.py --wyniki-dir /app/wyniki || echo "[UWAGA] Błąd przy generowaniu raportu końcowego"
 
       - name: Generuj metryki CI/CD (NEW v2.1)
         run: |
-          echo "📈 Generowanie metryk pipeline..."
+          echo "[METRYKI] Generowanie metryk pipeline..."
           docker run --rm \
             -v ${{ github.workspace }}/wyniki:/app/wyniki \
-            regulator-sim:test python -c "from src.metryki_pipeline import MetrykiPipeline; m = MetrykiPipeline('/app/wyniki'); m.generuj_badge_svg(); m.generuj_raport_markdown()" || echo "⚠️ Błąd przy generowaniu metryk"
+            regulator-sim:test python -c "from src.metryki_pipeline import MetrykiPipeline; m = MetrykiPipeline('/app/wyniki'); m.generuj_badge_svg(); m.generuj_raport_markdown()" || echo "[UWAGA] Błąd przy generowaniu metryk"
 
       - name: Sprawdź wyniki i zdecyduj o statusie
         run: |
           cd wyniki
           if [ ! -f raport.html ]; then
-            echo "Brak raportu HTML — prawdopodobnie brak wyników walidacji"
+            echo "Brak raportu HTML - prawdopodobnie brak wynikow walidacji"
             exit 1
           fi
 
-          PASS_COUNT=$(grep -o "✅" raport.html | wc -l)
+          PASS_COUNT=$(grep -o "\[OK\]" raport.html | wc -l)
           if [ "$PASS_COUNT" -eq 0 ]; then
-            echo "❌ Żaden model nie spełnił progów jakości — pipeline FAIL"
+            echo "[X] Zaden model nie spelnił progow jakości - pipeline FAIL"
             exit 1
           else
-            echo "✅ Walidacja pozytywna — pipeline OK ($PASS_COUNT pozytywnych testów)"
+            echo "[OK] Walidacja pozytywna - pipeline OK ($PASS_COUNT pozytywnych testow)"
           fi
 
       - name: Upload raportu końcowego
@@ -265,12 +265,12 @@ jobs:
       - name: Read passed models
         id: read_models
         run: |
-          echo "📄 Odczytuję listę modeli..."
+          echo "[PLIKI] Odczytuje liste modeli..."
           if [ ! -f wyniki/passed_models.txt ]; then
-            echo "⚠️ Brak pliku wyniki/passed_models.txt"
+            echo "[UWAGA] Brak pliku wyniki/passed_models.txt"
             echo "has_models=false" >> $GITHUB_OUTPUT
           else
-            echo "✅ Modele do wdrożenia:"
+            echo "[OK] Modele do wdrozenia:"
             cat wyniki/passed_models.txt
             MODELS=$(cat wyniki/passed_models.txt | tr '\n' ' ' | xargs)
             echo "models=$MODELS" >> $GITHUB_OUTPUT
@@ -292,7 +292,7 @@ jobs:
             SAFE_MODEL=$(echo "$MODEL" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
             OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
             IMAGE="ghcr.io/${OWNER}/${SAFE_MODEL}-regulator:latest"
-            echo "🚀 Buduję i wysyłam obraz: $IMAGE"
+            echo "[BUILD] Buduje i wysylam obraz: $IMAGE"
             docker build -t "$IMAGE" -f kontener/Dockerfile .
             docker push "$IMAGE"
           done
@@ -307,38 +307,38 @@ jobs:
           echo "🧩 Klonuję repozytorium GitOps..."
           git clone https://${GH_TOKEN}@github.com/JakubZasadni/cl-gitops-regulatory.git gitops
           
-          echo "🚀 Automatyczne wdrożenie przez nowy skrypt..."
+          echo "[START] Automatyczne wdrozenie przez nowy skrypt..."
           docker run --rm \
             -v ${{ github.workspace }}/wyniki:/app/wyniki \
             -v ${{ github.workspace }}/gitops:/app/gitops \
             regulator-sim:test python src/wdrozenie_gitops.py \
               --wyniki-dir /app/wyniki \
               --gitops-repo /app/gitops \
-              --push || echo "⚠️ Wdrożenie GitOps zakończone z ostrzeżeniami"
+              --push || echo "[UWAGA] Wdrozenie GitOps zakonczone z ostrzezeniami"
           
           cd gitops
           git config user.email "ci@github"
           git config user.name "GitHub Actions"
 
-          echo "🔍 Sprawdzam zmiany w GitOps..."
+          echo "[INFO] Sprawdzam zmiany w GitOps..."
           if git diff --quiet; then
-            echo "✅ Brak zmian do zapisania — pomijam push."
+            echo "[OK] Brak zmian do zapisania - pomijam push."
           else
-            echo "📦 Wypycham zmiany GitOps..."
-            git push origin main || (echo '❌ Git push failed, sprawdź uprawnienia GH_TOKEN' && exit 1)
+            echo "[PUSH] Wypycham zmiany GitOps..."
+            git push origin main || (echo '[X] Git push failed, sprawdz uprawnienia GH_TOKEN' && exit 1)
           fi
           
-          echo "🏷️ Aktualizuję tagi obrazów Docker..."
+          echo "[DOCKER] Aktualizuje tagi obrazow Docker..."
           cd ..
           for MODEL in ${{ steps.read_models.outputs.models }}; do
             SAFE_MODEL=$(echo "$MODEL" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
-            echo "🔧 Aktualizuję obraz dla modelu: $SAFE_MODEL"
-            yq -i ".spec.template.spec.containers[0].image = \"ghcr.io/${{ github.repository_owner }}/${SAFE_MODEL}-regulator:latest\"" gitops/kustomize/apps/${SAFE_MODEL}/base/deployment.yml || echo "⚠️ Brak pliku deployment.yml dla $SAFE_MODEL"
+            echo "[KONFIGURACJA] Aktualizuje obraz dla modelu: $SAFE_MODEL"
+            yq -i ".spec.template.spec.containers[0].image = \"ghcr.io/${{ github.repository_owner }}/${SAFE_MODEL}-regulator:latest\"" gitops/kustomize/apps/${SAFE_MODEL}/base/deployment.yml || echo "[UWAGA] Brak pliku deployment.yml dla $SAFE_MODEL"
           done
           
           cd gitops
           if git diff --quiet; then
-            echo "✅ Obrazy już aktualne"
+            echo "[OK] Obrazy juz aktualne"
           else
             git add .
             git commit -m "auto-deploy: updated Docker images for passed models [ci skip]"

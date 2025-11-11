@@ -138,7 +138,7 @@ def strojenie_siatka(RegulatorClass, model_nazwa: str, typ_regulatora: str,
     Returns:
         dict: {"Kp": ..., "Ti": ..., "Td": ...}
     """
-    print(f"\n🔍 Przeszukiwanie siatki dla {typ_regulatora} na modelu {model_nazwa}...")
+    print(f"\n[SZUKANIE] Przeszukiwanie siatki dla {typ_regulatora} na modelu {model_nazwa}...")
     
     # Wczytaj konfigurację
     config = pobierz_konfiguracje()
@@ -152,7 +152,7 @@ def strojenie_siatka(RegulatorClass, model_nazwa: str, typ_regulatora: str,
     
     # ========== FAZA 1: GRUBA SIATKA (jeśli adaptacyjne) ==========
     if czy_adaptacyjne:
-        print("📊 FAZA 1: Gruba siatka (szybkie przeszukanie)...")
+        print("[ANALIZA] FAZA 1: Gruba siatka (szybkie przeszukanie)...")
         config_adaptacyjny = config.pobierz_config_adaptacyjny()
         mnoznik_grubej = config_adaptacyjny['faza_gruba']['gestosc_mnoznik']
         
@@ -186,7 +186,7 @@ def strojenie_siatka(RegulatorClass, model_nazwa: str, typ_regulatora: str,
     czy_rownolegle_bezpieczne = czy_rownolegle and n_jobs != 1 and total_tests <= bezpieczny_limit_parallel
     
     if not czy_rownolegle_bezpieczne and total_tests > bezpieczny_limit_parallel:
-        logging.info(f"  ⚠️ Duża siatka ({total_tests} kombinacji): wyłączono równoległość dla stabilności")
+        logging.info(f"  [UWAGA] Duża siatka ({total_tests} kombinacji): wyłączono równoległość dla stabilności")
     
     # Testuj równolegle lub sekwencyjnie
     if czy_rownolegle_bezpieczne:
@@ -212,18 +212,18 @@ def strojenie_siatka(RegulatorClass, model_nazwa: str, typ_regulatora: str,
             best_params_faza1 = params
     
     if best_params_faza1 is None:
-        print("⚠️ FAZA 1: Nie znaleziono stabilnych parametrów!")
+        print("[UWAGA] FAZA 1: Nie znaleziono stabilnych parametrów!")
         best_params_faza1 = {
             "Kp": 1.0, 
             "Ti": 10.0 if typ in ["regulator_pi", "regulator_pid"] else None,
             "Td": 3.0 if typ in ["regulator_pd", "regulator_pid"] else None
         }
     else:
-        print(f"✅ FAZA 1 zakończona: Kp={best_params_faza1['Kp']:.3f}, kara={best_kara_faza1:.2f}")
+        print(f"[OK] FAZA 1 zakończona: Kp={best_params_faza1['Kp']:.3f}, kara={best_kara_faza1:.2f}")
     
     # ========== FAZA 2: ZAGĘSZCZONA SIATKA (jeśli adaptacyjne) ==========
     if czy_adaptacyjne:
-        print("\n📊 FAZA 2: Zagęszczona siatka (dokładne przeszukanie wokół optimum)...")
+        print("\n[ANALIZA] FAZA 2: Zagęszczona siatka (dokładne przeszukanie wokół optimum)...")
         config_adaptacyjny = config.pobierz_config_adaptacyjny()
         margines = config_adaptacyjny['faza_dokladna']['margines_procent']
         mnoznik_dokladnej = config_adaptacyjny['faza_dokladna']['gestosc_mnoznik']
@@ -254,7 +254,7 @@ def strojenie_siatka(RegulatorClass, model_nazwa: str, typ_regulatora: str,
         czy_rownolegle_faza2 = czy_rownolegle and n_jobs != 1 and total_tests_faza2 <= bezpieczny_limit_parallel
         
         if not czy_rownolegle_faza2 and total_tests_faza2 > bezpieczny_limit_parallel:
-            logging.info(f"  ⚠️ Duża siatka faza 2 ({total_tests_faza2} kombinacji): wyłączono równoległość")
+            logging.info(f"  [UWAGA] Duża siatka faza 2 ({total_tests_faza2} kombinacji): wyłączono równoległość")
         
         # Testuj równolegle lub sekwencyjnie
         if czy_rownolegle_faza2:
@@ -278,9 +278,9 @@ def strojenie_siatka(RegulatorClass, model_nazwa: str, typ_regulatora: str,
                 best_params = params
         
         if best_kara < best_kara_faza1:
-            print(f"✅ FAZA 2: Znaleziono lepsze parametry! Poprawa: {best_kara_faza1:.2f} → {best_kara:.2f}")
+            print(f"[OK] FAZA 2: Znaleziono lepsze parametry! Poprawa: {best_kara_faza1:.2f} → {best_kara:.2f}")
         else:
-            print(f"ℹ️ FAZA 2: Brak poprawy, pozostaję przy wynikach z fazy 1")
+            print(f"[INFO] FAZA 2: Brak poprawy, pozostaję przy wynikach z fazy 1")
     else:
         # Brak adaptacyjnego zagęszczania
         best_params = best_params_faza1
@@ -292,7 +292,7 @@ def strojenie_siatka(RegulatorClass, model_nazwa: str, typ_regulatora: str,
         val = best_params.get(k)
         result[k] = round(val, 4) if val is not None else None
     
-    print(f"\n✅ Najlepsze parametry (kara={best_kara:.2f}): Kp={result['Kp']}, Ti={result['Ti']}, Td={result['Td']}")
+    print(f"\n[OK] Najlepsze parametry (kara={best_kara:.2f}): Kp={result['Kp']}, Ti={result['Ti']}, Td={result['Td']}")
     return result
 
 

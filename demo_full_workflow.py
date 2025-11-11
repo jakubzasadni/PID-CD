@@ -25,7 +25,7 @@ def print_header(text):
 
 def run_command(cmd, description, cwd=None):
     """Uruchamia komendę i wyświetla wynik."""
-    print(f"🚀 {description}")
+    print(f"[START] {description}")
     print(f"   Komenda: {cmd}")
     
     try:
@@ -37,18 +37,18 @@ def run_command(cmd, description, cwd=None):
             capture_output=True,
             text=True
         )
-        print(f"✅ Sukces!")
+        print(f"[OK] Sukces!")
         if result.stdout:
             print(f"   Output: {result.stdout[:200]}")  # Pierwsze 200 znaków
         return True
     except subprocess.CalledProcessError as e:
-        print(f"❌ Błąd: {e}")
+        print(f"[X] Błąd: {e}")
         if e.stderr:
             print(f"   Error: {e.stderr[:200]}")
         return False
 
 def main():
-    print_header("🎓 DEMO: Pełny workflow CI/CD - Projekt Inżynierski")
+    print_header(" DEMO: Pełny workflow CI/CD - Projekt Inżynierski")
     print("Automatyzacja procesu strojenia, walidacji i wdrożeń")
     print("aplikacji sterowania procesami w środowisku Kubernetes\n")
     
@@ -73,7 +73,7 @@ def main():
     
     for regulator in regulatory:
         for model in modele:
-            print(f"\n📊 {regulator} + {model}")
+            print(f"\n[ANALIZA] {regulator} + {model}")
             
             # Strojenie
             os.environ["REGULATOR"] = regulator
@@ -107,9 +107,9 @@ def main():
     gitops_repo = Path("../cl-gitops-regulatory")
     
     if gitops_repo.exists():
-        print(f"✅ Repozytorium GitOps znalezione: {gitops_repo.resolve()}")
+        print(f"[OK] Repozytorium GitOps znalezione: {gitops_repo.resolve()}")
         
-        deploy_choice = input("\n🚀 Czy wdrożyć najlepsze parametry do Kubernetes? (t/N): ")
+        deploy_choice = input("\n[START] Czy wdrożyć najlepsze parametry do Kubernetes? (t/N): ")
         
         if deploy_choice.lower() in ['t', 'y', 'tak', 'yes']:
             cmd = f"python src/wdrozenie_gitops.py --gitops-repo {gitops_repo}"
@@ -122,13 +122,13 @@ def main():
             success = run_command(cmd, "Wdrożenie przez GitOps")
             
             if success:
-                print("\n✅ Parametry wdrożone!")
+                print("\n[OK] Parametry wdrożone!")
                 print("   Sprawdź: wyniki/OSTATNIE_WDROZENIE.md")
                 print("   GitOps: ArgoCD/FluxCD automatycznie zsynchronizuje klaster")
         else:
-            print("⏭️ Pomijam wdrożenie (można uruchomić później)")
+            print("[SKIP] Pomijam wdrożenie (można uruchomić później)")
     else:
-        print(f"⚠️ Repozytorium GitOps nie znalezione: {gitops_repo}")
+        print(f"[UWAGA] Repozytorium GitOps nie znalezione: {gitops_repo}")
         print("   Pomijam etap wdrożenia")
     
     # =========================================================================
@@ -139,13 +139,13 @@ def main():
     end_time = datetime.now()
     total_time = (end_time - start_time).total_seconds()
     
-    print(f"⏱️  Całkowity czas workflow: {total_time:.1f}s ({total_time/60:.1f} min)")
-    print(f"📊 Liczba przetestowanych kombinacji: 36")
+    print(f"[CZAS]  Całkowity czas workflow: {total_time:.1f}s ({total_time/60:.1f} min)")
+    print(f"[ANALIZA] Liczba przetestowanych kombinacji: 36")
     print(f"⚡ Średni czas na kombinację: {total_time/36:.1f}s")
     
     # Wyświetl metryki pipeline
     if Path("wyniki/WYNIKI_EKSPERYMENTOW.md").exists():
-        print("\n📈 Raport metryk CI/CD:")
+        print("\n[WYKRESY] Raport metryk CI/CD:")
         with open("wyniki/WYNIKI_EKSPERYMENTOW.md", "r", encoding="utf-8") as f:
             lines = f.readlines()[:20]  # Pierwsze 20 linii
             print("".join(lines))
@@ -153,9 +153,9 @@ def main():
     # =========================================================================
     # WNIOSKI I NASTĘPNE KROKI
     # =========================================================================
-    print_header("✅ WORKFLOW ZAKOŃCZONY")
+    print_header("[OK] WORKFLOW ZAKOŃCZONY")
     
-    print("📂 Wygenerowane pliki:\n")
+    print(" Wygenerowane pliki:\n")
     print("1. Wyniki strojenia:")
     print("   - wyniki/parametry_*.json - parametry regulatorów")
     print("   - wyniki/raport_strojenie_*.html - raporty HTML dla każdej metody")
@@ -179,7 +179,7 @@ def main():
     print("   - ../cl-gitops-regulatory/kustomize/apps/*/base/configmap.yml")
     print("")
     
-    print("\n🎯 Następne kroki:")
+    print("\n Następne kroki:")
     print("1. Przejrzyj raport końcowy w przeglądarce")
     print("2. Sprawdź WYNIKI_EKSPERYMENTOW.md dla metryk CI/CD")
     print("3. Jeśli wdrożono do GitOps:")
@@ -188,7 +188,7 @@ def main():
     print("4. Użyj danych CSV do dalszej analizy (Excel, Python, R)")
     
     print("\n" + "=" * 70)
-    print("🎓 Praca inżynierska: Dane gotowe do dokumentacji!")
+    print(" Praca inżynierska: Dane gotowe do dokumentacji!")
     print("=" * 70)
     
     # Opcjonalnie otwórz raport w przeglądarce
@@ -200,16 +200,16 @@ def main():
             raport_file = latest_raport[-1]
             import webbrowser
             webbrowser.open(raport_file.as_uri())
-            print(f"✅ Otwarto: {raport_file}")
+            print(f"[OK] Otwarto: {raport_file}")
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n\n⚠️ Workflow przerwany przez użytkownika")
+        print("\n\n[UWAGA] Workflow przerwany przez użytkownika")
         sys.exit(1)
     except Exception as e:
-        print(f"\n\n❌ Błąd: {e}")
+        print(f"\n\n[X] Błąd: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

@@ -21,7 +21,7 @@ def ocena_metod(wyniki_dir: str):
     # --- Raporty z walidacji (tylko standardowe, bez rozszerzonych) ---
     raporty = sorted([f for f in wyniki_path.glob("raport_*.json") if "rozszerzony" not in f.name])
     if not raporty:
-        print("⚠️ Brak raportów do oceny w katalogu:", wyniki_path)
+        print("[UWAGA] Brak raportów do oceny w katalogu:", wyniki_path)
         return
 
     dane = []
@@ -53,10 +53,10 @@ def ocena_metod(wyniki_dir: str):
         with open(wyniki_path / "passed_models.txt", "w") as f:
             for m in passed_models:
                 f.write(m + "\n")
-        print("✅ Utworzono listę modeli do wdrożenia:", wyniki_path / "passed_models.txt")
+        print("[OK] Utworzono listę modeli do wdrożenia:", wyniki_path / "passed_models.txt")
         print("Modele:", ", ".join(passed_models))
     else:
-        print("❌ Żaden model nie spełnił progów jakości — brak passed_models.txt")
+        print("[X] Żaden model nie spełnił progów jakości — brak passed_models.txt")
 
     # --- HTML ---
     html = []
@@ -89,7 +89,7 @@ def ocena_metod(wyniki_dir: str):
             f"<tr class='{cls}'><td>{r['regulator']}</td><td>{r['metoda']}</td><td>{r['model']}</td>"
             f"<td>{m['IAE']:.2f}</td><td>{m['ISE']:.2f}</td>"
             f"<td>{m['przeregulowanie']:.1f}</td><td>{m['czas_ustalania']:.1f}</td>"
-            f"<td>{'✅ PASS' if passed else '❌ FAIL'}</td></tr>"
+            f"<td>{'[OK] PASS' if passed else '[X] FAIL'}</td></tr>"
         )
     html.append("</table>")
 
@@ -125,8 +125,8 @@ def ocena_metod(wyniki_dir: str):
     with open(wyniki_path / "najlepszy_regulator.json", "w") as f:
         json.dump({"najlepszy_regulator": najlepszy_regulator, "statystyki": statystyki}, f, indent=2)
 
-    print(f"✅ Raport HTML zapisano jako: {raport_html}")
-    print(f"✅ Najlepszy regulator: {najlepszy_regulator.upper()} (średni IAE={statystyki[najlepszy_regulator]['avg_IAE']:.2f})")
+    print(f"[OK] Raport HTML zapisano jako: {raport_html}")
+    print(f"[OK] Najlepszy regulator: {najlepszy_regulator.upper()} (średni IAE={statystyki[najlepszy_regulator]['avg_IAE']:.2f})")
 
 
 if __name__ == "__main__":
