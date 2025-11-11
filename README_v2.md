@@ -99,6 +99,10 @@ python src/wdrozenie_gitops.py --gitops-repo ../cl-gitops-regulatory
 - `--push` - automatyczny push do remote
 - `--model zbiornik_1rz` - wdróż tylko konkretny model
 
+**Lokalne wdrożenie Kubernetes:**
+Repository GitOps zawiera kompletne narzędzia do lokalnego wdrożenia z ArgoCD. Zobacz:
+📦 [cl-gitops-regulatory/LOCAL_DEPLOYMENT.md](https://github.com/JakubZasadni/cl-gitops-regulatory/blob/main/LOCAL_DEPLOYMENT.md)
+
 ### 3. Metryki CI/CD Pipeline
 Automatyczny pomiar czasu i generowanie raportów:
 ```powershell
@@ -115,3 +119,41 @@ python src/uruchom_pipeline.py
 ```powershell
 cat wyniki/WYNIKI_EKSPERYMENTOW.md
 ```
+
+## 🚀 Wdrożenie lokalne z Kubernetes + ArgoCD
+
+System umożliwia pełne lokalne wdrożenie w klastrze Minikube z automatyczną synchronizacją przez ArgoCD.
+
+**Szybki start:**
+```powershell
+# Sklonuj repo GitOps
+git clone https://github.com/JakubZasadni/cl-gitops-regulatory.git
+cd cl-gitops-regulatory
+
+# Automatyczna instalacja (Minikube + ArgoCD + Aplikacje)
+./install-local.ps1
+
+# Dostęp do ArgoCD UI
+./start-argocd-ui.ps1
+
+# Status środowiska
+./status.ps1
+```
+
+**Co zostanie wdrożone:**
+- ✅ Klaster Kubernetes (Minikube)
+- ✅ ArgoCD (GitOps controller)
+- ✅ 3 aplikacje regulatorów:
+  - `dwa-zbiorniki`
+  - `wahadlo-odwrocone`
+  - `zbiornik-1rz`
+
+**Automatyczna synchronizacja:**
+1. Pipeline CI/CD w `PID-CD` generuje nowe parametry
+2. Automatycznie commituje do `cl-gitops-regulatory`
+3. ArgoCD wykrywa zmiany i wdraża do klastra
+4. Aplikacje są automatycznie aktualizowane
+
+**Pełna dokumentacja:**
+📖 [LOCAL_DEPLOYMENT.md](https://github.com/JakubZasadni/cl-gitops-regulatory/blob/main/LOCAL_DEPLOYMENT.md)
+
