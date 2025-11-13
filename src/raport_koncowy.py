@@ -34,12 +34,8 @@ class GeneratorRaportuKoncowego:
         print(" Zbieranie danych z raportów walidacji...")
         
         # Szukaj w głównym folderze i podfolderach
-        for pattern in ["raport_*.json", "*/raport_*.json"]:
+        for pattern in ["raport_rozszerzony_*.json", "*/raport_rozszerzony_*.json"]:
             for plik in self.wyniki_dir.glob(pattern):
-                # Pomijaj raporty rozszerzone
-                if "rozszerzony" in plik.name:
-                    continue
-                    
                 try:
                     with open(plik, "r", encoding="utf-8") as f:
                         raport = json.load(f)
@@ -49,23 +45,41 @@ class GeneratorRaportuKoncowego:
                     metoda = raport.get("metoda", "unknown")
                     model = raport.get("model", "unknown")
                     
-                    # Dodaj czas obliczeń jeśli dostępny
-                    czas_obliczen = raport.get("czas_obliczen_s", None)
+                    # Pobierz scenariusze z raportu rozszerzonego
+                    scenariusze = raport.get("scenariusze", [])
                     
-                    # Pobierz metryki
-                    metryki = raport.get("metryki", {})
+                    # Oblicz średnie metryki ze wszystkich scenariuszy
+                    if scenariusze:
+                        iae_list = [s.get("IAE") for s in scenariusze if s.get("IAE") is not None]
+                        ise_list = [s.get("ISE") for s in scenariusze if s.get("ISE") is not None]
+                        mp_list = [s.get("Mp") for s in scenariusze if s.get("Mp") is not None]
+                        ts_list = [s.get("ts") for s in scenariusze if s.get("ts") is not None]
+                        pass_list = [s.get("PASS", False) for s in scenariusze]
+                        
+                        iae_mean = mean(iae_list) if iae_list else None
+                        ise_mean = mean(ise_list) if ise_list else None
+                        mp_mean = mean(mp_list) if mp_list else None
+                        ts_mean = mean(ts_list) if ts_list else None
+                        pass_rate = sum(pass_list) / len(pass_list) if pass_list else 0
+                    else:
+                        iae_mean = ise_mean = mp_mean = ts_mean = None
+                        pass_rate = 0
+                    
+                    # Sprawdź czy walidacja przeszła (co najmniej 80% scenariuszy)
+                    podsumowanie = raport.get("podsumowanie", {})
+                    procent_pass = podsumowanie.get("procent", 0)
                     
                     self.dane.append({
                         "regulator": regulator,
                         "metoda": metoda,
                         "model": model,
-                        "IAE": metryki.get("IAE", None),
-                        "ISE": metryki.get("ISE", None),
-                        "ITAE": metryki.get("ITAE", None),
-                        "Mp": metryki.get("przeregulowanie", None),
-                        "ts": metryki.get("czas_ustalania", None),
-                        "PASS": raport.get("PASS", False),
-                        "czas_obliczen": czas_obliczen,
+                        "IAE": iae_mean,
+                        "ISE": ise_mean,
+                        "ITAE": None,  # Brak w raportach rozszerzonych
+                        "Mp": mp_mean,
+                        "ts": ts_mean,
+                        "PASS": procent_pass >= 80,  # Pass jeśli >= 80% scenariuszy zaliczonych
+                        "czas_obliczen": None,  # Brak w raportach rozszerzonych
                         "plik": plik.name
                     })
                 except Exception as e:
