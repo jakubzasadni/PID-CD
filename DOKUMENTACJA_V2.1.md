@@ -2272,22 +2272,79 @@ def main():
 
 ```python
 def zbierz_dane(self):
-    pliki_walidacji = glob.glob(os.path.join(self.wyniki_dir, "walidacja_*.json"))
+    """Zbiera raporty rozszerzone z walidacji (raport_rozszerzony_*.json)."""
     
     dane = []
-    for plik in pliki_walidacji:
-        with open(plik, 'r') as f:
-            wynik = json.load(f)
-        
-        # Ekstrakcja danych
-        wiersz = {
-            "model": wynik["model"],
-            "regulator": wynik["regulator"],
-            "metoda": wynik["metoda"],
-            "Kp": wynik["parametry"].get("Kp"),
-            "Ti": wynik["parametry"].get("Ti"),
-            "Td": wynik["parametry"].get("Td"),
-            "IAE": wynik["metryki"]["IAE"],
+    # Szukaj raportów rozszerzonych (5 scenariuszy na kombinację)
+    for pattern in ["raport_rozszerzony_*.json", "*/raport_rozszerzony_*.json"]:
+        for plik in self.wyniki_dir.glob(pattern):
+            with open(plik, 'r', encoding='utf-8') as f:
+                raport = json.load(f)
+            
+            # Wyciągnij informacje z pliku JSON
+            regulator = raport.get("regulator", "unknown")
+            metoda = raport.get("metoda", "unknown")
+            model = raport.get("model", "unknown")
+            
+            # Pobierz scenariusze z raportu rozszerzonego
+            scenariusze = raport.get("scenariusze", [])
+            
+            # Oblicz średnie metryki ze wszystkich scenariuszy (5 testów)
+            if scenariusze:
+                # Metryki są w obiekcie "metryki" w każdym scenariuszu
+                iae_list = []
+                ise_list = []
+                mp_list = []
+                ts_list = []
+                pass_list = []
+                
+                for s in scenariusze:
+                    metryki = s.get("metryki", {})
+                    if metryki.get("IAE") is not None:
+                        iae_list.append(metryki["IAE"])
+                    if metryki.get("ISE") is not None:
+                        ise_list.append(metryki["ISE"])
+                    if metryki.get("przeregulowanie") is not None:
+                        mp_list.append(metryki["przeregulowanie"])
+                    if metryki.get("czas_ustalania") is not None:
+                        ts_list.append(metryki["czas_ustalania"])
+                    pass_list.append(s.get("pass", False))
+                
+                # Średnie ze wszystkich scenariuszy
+                iae_mean = mean(iae_list) if iae_list else None
+                ise_mean = mean(ise_list) if ise_list else None
+                mp_mean = mean(mp_list) if mp_list else None
+                ts_mean = mean(ts_list) if ts_list else None
+                pass_rate = sum(pass_list) / len(pass_list) * 100 if pass_list else 0
+            else:
+                iae_mean = ise_mean = mp_mean = ts_mean = None
+                pass_rate = 0
+            
+            # Sprawdź czy walidacja przeszła (≥ 80% scenariuszy)
+            podsumowanie = raport.get("podsumowanie", {})
+            procent_pass = podsumowanie.get("procent", 0)
+            
+            dane.append({
+                "regulator": regulator,
+                "metoda": metoda,
+                "model": model,
+                "IAE": iae_mean,
+                "ISE": ise_mean,
+                "Mp": mp_mean,
+                "ts": ts_mean,
+                "PASS": procent_pass >= 80,  # Pass jeśli ≥80% scenariuszy zaliczonych
+                "pass_rate": pass_rate,
+                "plik": plik.name
+            })
+    
+    return pd.DataFrame(dane)
+```
+
+**Wyjaśnienie:**
+- Kod czyta raporty rozszerzone (`raport_rozszerzony_*.json`), a nie podstawowe (`raport_*.json`)
+- Każdy raport rozszerzony zawiera 5 scenariuszy testowych z różnymi warunkami
+- Średnie metryki są obliczane ze wszystkich scenariuszy dla danej kombinacji (regulator, metoda, model)
+- Pass rate jest procentem scenariuszy które przeszły progi (≥80% = PASS całościowy)
             "Mp": wynik["metryki"]["przeregulowanie"],
             "ts": wynik["metryki"]["czas_ustalania"],
             "PASS": wynik.get("PASS", False),

@@ -50,11 +50,24 @@ class GeneratorRaportuKoncowego:
                     
                     # Oblicz średnie metryki ze wszystkich scenariuszy
                     if scenariusze:
-                        iae_list = [s.get("IAE") for s in scenariusze if s.get("IAE") is not None]
-                        ise_list = [s.get("ISE") for s in scenariusze if s.get("ISE") is not None]
-                        mp_list = [s.get("Mp") for s in scenariusze if s.get("Mp") is not None]
-                        ts_list = [s.get("ts") for s in scenariusze if s.get("ts") is not None]
-                        pass_list = [s.get("PASS", False) for s in scenariusze]
+                        # Metryki są w obiekcie "metryki" w każdym scenariuszu
+                        iae_list = []
+                        ise_list = []
+                        mp_list = []
+                        ts_list = []
+                        pass_list = []
+                        
+                        for s in scenariusze:
+                            metryki = s.get("metryki", {})
+                            if metryki.get("IAE") is not None:
+                                iae_list.append(metryki["IAE"])
+                            if metryki.get("ISE") is not None:
+                                ise_list.append(metryki["ISE"])
+                            if metryki.get("przeregulowanie") is not None:
+                                mp_list.append(metryki["przeregulowanie"])
+                            if metryki.get("czas_ustalania") is not None:
+                                ts_list.append(metryki["czas_ustalania"])
+                            pass_list.append(s.get("pass", False))
                         
                         iae_mean = mean(iae_list) if iae_list else None
                         ise_mean = mean(ise_list) if ise_list else None
