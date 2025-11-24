@@ -168,19 +168,19 @@ class GeneratorRaportuKoncowego:
                 html.append(f"<td><b>{metoda.replace('_', ' ').title()}</b></td>")
                 html.append(f"<td>{pass_rate:.1f}%</td>")
                 
-                # IAE
+                # IAE - ukryj std jeśli nan lub jest tylko 1 próbka
                 if stats["IAE_mean"] is not None:
                     iae_str = f"{stats['IAE_mean']:.2f}"
-                    if stats["IAE_std"] is not None:
+                    if stats["IAE_std"] is not None and not np.isnan(stats["IAE_std"]) and stats["liczba_prob"] > 1:
                         iae_str += f"±{stats['IAE_std']:.2f}"
                     html.append(f"<td>{iae_str}</td>")
                 else:
                     html.append("<td>-</td>")
                 
-                # Mp
+                # Mp - ukryj std jeśli nan lub jest tylko 1 próbka
                 if stats["Mp_mean"] is not None:
                     mp_str = f"{stats['Mp_mean']:.1f}"
-                    if stats["Mp_std"] is not None:
+                    if stats["Mp_std"] is not None and not np.isnan(stats["Mp_std"]) and stats["liczba_prob"] > 1:
                         mp_str += f"±{stats['Mp_std']:.1f}"
                     html.append(f"<td>{mp_str}%</td>")
                 else:
@@ -372,39 +372,78 @@ class GeneratorRaportuKoncowego:
             top3 = ranking_df.head(3)
             wnioski.append(f"<li><b>Najlepsze kombinacje Model+Metoda:</b><ul>")
             for idx, row in top3.iterrows():
+                status = "✓ PASS" if row['pass_rate'] >= 80 else f"✗ {row['pass_rate']:.0f}% pass rate"
                 wnioski.append(f"<li>{row['model'].replace('_', ' ').title()} + "
                               f"{row['metoda'].replace('_', ' ').title()} "
-                              f"(pass rate: {row['pass_rate']:.0f}%, IAE: {row['IAE']:.2f})</li>")
+                              f"({status}, IAE: {row['IAE']:.2f}, Mp: {row['Mp']:.1f}%)</li>")
             wnioski.append("</ul></li>")
         
-        # Analiza per model
+        # Analiza per model - dynamiczna
+        wnioski.append("<li><b>Analiza per model:</b><ul>")
         for model in self.modele:
             if model not in wyniki_stats:
                 continue
             
             najlepsza_metoda = None
-            najlepszy_pass = 0
+            najlepszy_pass = -1
+            najlepsze_iae = float('inf')
             
             for metoda, stats in wyniki_stats[model].items():
-                if stats["pass_rate"] > najlepszy_pass:
+                # Priorytet: pass_rate, potem IAE
+                if stats["pass_rate"] > najlepszy_pass or \
+                   (stats["pass_rate"] == najlepszy_pass and stats["IAE_mean"] and stats["IAE_mean"] < najlepsze_iae):
                     najlepszy_pass = stats["pass_rate"]
+                    najlepsze_iae = stats["IAE_mean"] if stats["IAE_mean"] else float('inf')
                     najlepsza_metoda = metoda
             
             if najlepsza_metoda:
-                wnioski.append(f"<li><b>Model {model.replace('_', ' ').title()}:</b> "
-                              f"Najlepsza metoda to <b>{najlepsza_metoda.replace('_', ' ').title()}</b> "
-                              f"z pass rate {najlepszy_pass:.0f}%</li>")
+                stats = wyniki_stats[model][najlepsza_metoda]
+                if najlepszy_pass >= 80:
+                    opis = f"<span class='pass'>zaliczona</span> (pass rate: {najlepszy_pass:.0f}%)"
+                elif najlepszy_pass > 0:
+                    opis = f"<span style='color: orange;'>częściowo zaliczona</span> (pass rate: {najlepszy_pass:.0f}%)"
+                else:
+                    opis = f"<span class='fail'>niezaliczona</span> - wymaga poprawy parametrów"
+                
+                wnioski.append(f"<li><b>{model.replace('_', ' ').title()}:</b> "
+                              f"Najlepsza metoda to <b>{najlepsza_metoda.replace('_', ' ').title()}</b>, "
+                              f"{opis}. IAE średnie: {stats['IAE_mean']:.2f}, "
+                              f"Mp średnie: {stats['Mp_mean']:.1f}%</li>")
+        wnioski.append("</ul></li>")
         
-        # Porównanie czasu obliczeń
-        wnioski.append("<li><b>Czas obliczeń:</b> Metoda <b>Ziegler-Nichols</b> jest najszybsza (analityczna), "
-                      "metoda <b>siatka</b> jest wolniejsza ale bardziej dokładna, "
-                      "metoda <b>optymalizacja</b> oferuje najlepszy kompromis czas/jakość.</li>")
+        # Porównanie metod - dynamiczne
+        metody_pass_rate = {}
+        for model_stats in wyniki_stats.values():
+            for metoda, stats in model_stats.items():
+                if metoda not in metody_pass_rate:
+                    metody_pass_rate[metoda] = []
+                metody_pass_rate[metoda].append(stats["pass_rate"])
         
-        # Ogólne zalecenia
-        wnioski.append("<li><b>Zalecenia dla wdrożenia:</b><ul>")
-        wnioski.append("<li>Do systemów o prostej dynamice (zbiornik 1-rzędowy): optymalizacja lub siatka</li>")
-        wnioski.append("<li>Do systemów złożonych (kaskady, wahadło): preferuj siatkę dla bezpieczeństwa</li>")
-        wnioski.append("<li>Do szybkiego prototypowania: Ziegler-Nichols jako punkt startowy</li>")
+        if metody_pass_rate:
+            wnioski.append("<li><b>Porównanie metod strojenia:</b><ul>")
+            for metoda, pass_rates in sorted(metody_pass_rate.items(), key=lambda x: -np.mean(x[1])):
+                avg_pass = np.mean(pass_rates)
+                wnioski.append(f"<li><b>{metoda.replace('_', ' ').title()}:</b> "
+                              f"średni pass rate {avg_pass:.1f}% w {len(pass_rates)} testach</li>")
+            wnioski.append("</ul></li>")
+        
+        # Ogólne zalecenia - dynamiczne
+        wnioski.append("<li><b>Zalecenia ogólne:</b><ul>")
+        
+        # Sprawdź czy są w ogóle jakieś PASSy
+        any_pass = any(s["pass_rate"] >= 80 for model_stats in wyniki_stats.values() for s in model_stats.values())
+        
+        if any_pass:
+            wnioski.append("<li>✓ Niektóre kombinacje osiągnęły próg 80% - można je wdrożyć do produkcji</li>")
+            wnioski.append("<li>Dla kombinacji failed: rozważ zmianę metody strojenia lub dostrojenie progów walidacji</li>")
+        else:
+            wnioski.append("<li>⚠️ <b>Żadna kombinacja nie osiągnęła progu 80% zaliczonych scenariuszy</b></li>")
+            wnioski.append("<li>Rekomendacja: Przeanalizuj progi walidacji (IAE_max, Mp_max, ts_max) - mogą być zbyt restrykcyjne</li>")
+            wnioski.append("<li>Rozważ: poprawę strojenia parametrów regulatorów (inne siatki, inne funkcje celu w optymalizacji)</li>")
+        
+        wnioski.append("<li>Metoda <b>optymalizacja</b> zazwyczaj daje najlepsze wyniki dla IAE</li>")
+        wnioski.append("<li>Metoda <b>siatka</b> oferuje bezpieczniejsze parametry (mniejsze Mp)</li>")
+        wnioski.append("<li>Metoda <b>Ziegler-Nichols</b> to dobry punkt startowy do dalszego strojenia</li>")
         wnioski.append("</ul></li>")
         
         wnioski.append("</ol>")
@@ -451,6 +490,26 @@ class GeneratorRaportuKoncowego:
         pass_total = df["PASS"].sum()
         pass_rate_total = (pass_total / len(df) * 100) if len(df) > 0 else 0
         html.append(f"<p>Globalny pass rate: <b>{pass_rate_total:.1f}%</b> ({pass_total}/{len(df)})</p>")
+        
+        # Ostrzeżenie jeśli wszystkie failed
+        if pass_rate_total == 0:
+            html.append("<div style='background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 15px 0;'>")
+            html.append("<p style='margin: 0;'><b>⚠️ Uwaga:</b> Żadna kombinacja nie osiągnęła progu 80% zaliczonych scenariuszy. "
+                       "Ranking przedstawia relatywne porównanie, ale wszystkie wyniki wymagają poprawy parametrów.</p>")
+            html.append("</div>")
+        
+        # Dodaj sekcję o metodyce testowania
+        html.append("<h3>Metodyka walidacji rozszerzonej</h3>")
+        html.append("<p>Każda kombinacja regulator-model-metoda została przetestowana w <b>5 różnych scenariuszach</b>:</p>")
+        html.append("<ul>")
+        html.append("<li>📊 <b>Mały skok wartości zadanej</b> (+10.0) - test podstawowej regulacji</li>")
+        html.append("<li>📊 <b>Duży skok wartości zadanej</b> (+20.0) - test przy większej amplitudzie</li>")
+        html.append("<li>⚡ <b>Zakłócenie ujemne na wyjściu</b> (-3.0) - odporność na zakłócenia zewnętrzne</li>")
+        html.append("<li>⚡ <b>Zakłócenie dodatnie na wyjściu</b> (+3.0) - odporność na zakłócenia zewnętrzne</li>")
+        html.append("<li>📡 <b>Szum pomiarowy</b> (σ=0.5) - odporność na błędy pomiarowe</li>")
+        html.append("</ul>")
+        html.append("<p><b>Pass rate</b> = procent scenariuszy zaliczonych (próg: IAE, Mp, ts w granicach norm). "
+                   "Kombinacja otrzymuje <span class='pass'>PASS</span> gdy ≥80% scenariuszy spełnia kryteria.</p>")
         html.append("</div>")
         
         # Sekcja 2: Tabele porównawcze
@@ -462,10 +521,17 @@ class GeneratorRaportuKoncowego:
         # Sekcja 3: Ranking
         html.append("<div class='section'>")
         html.append("<h2>3. Ranking metod (wielokryterialna ocena)</h2>")
+        
+        # Sprawdź czy są dane o czasie
+        has_time_data = not ranking_df["czas_s"].isna().all() and (ranking_df["czas_s"] > 0).any()
+        
         html.append("<table border='1'>")
         html.append("<tr style='background-color: #4CAF50; color: white;'>")
         html.append("<th>Miejsce</th><th>Model</th><th>Metoda</th><th>Pass Rate</th>")
-        html.append("<th>IAE</th><th>Mp%</th><th>Czas (s)</th><th>Ocena*</th></tr>")
+        html.append("<th>IAE</th><th>Mp%</th>")
+        if has_time_data:
+            html.append("<th>Czas (s)</th>")
+        html.append("<th>Ocena*</th></tr>")
         
         for idx, (i, row) in enumerate(ranking_df.head(10).iterrows(), 1):
             medal = "🥇" if idx == 1 else ("🥈" if idx == 2 else ("🥉" if idx == 3 else ""))
@@ -476,12 +542,15 @@ class GeneratorRaportuKoncowego:
             html.append(f"<td>{row['pass_rate']:.0f}%</td>")
             html.append(f"<td>{row['IAE']:.2f}</td>")
             html.append(f"<td>{row['Mp']:.1f}%</td>")
-            html.append(f"<td>{row['czas_s']:.1f}s</td>")
+            if has_time_data:
+                html.append(f"<td>{row['czas_s']:.1f}s</td>")
             html.append(f"<td>{row['ocena']:.2f}</td>")
             html.append("</tr>")
         
         html.append("</table>")
         html.append("<p><i>*Ocena = funkcja wielokryterialna (wagi: pass_rate=0.4, IAE=0.3, Mp=0.2, czas=0.1). Niższa wartość = lepsza.</i></p>")
+        if not has_time_data:
+            html.append("<p><i>Kolumna 'Czas (s)' ukryta - brak danych o czasie obliczeń w raportach rozszerzonych.</i></p>")
         html.append("</div>")
         
         # Sekcja 4: Wykresy
