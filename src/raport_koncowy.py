@@ -33,7 +33,10 @@ class GeneratorRaportuKoncowego:
         """Zbiera wszystkie raporty walidacji z katalogu wyników."""
         print(" Zbieranie danych z raportów walidacji...")
         
-        # Szukaj w głównym folderze i podfolderach
+        # Śledź które kombinacje już mamy (priorytet: raport rozszerzony)
+        kombinacje_przetworzone = set()
+        
+        # KROK 1: Najpierw zbieraj raporty rozszerzone (5 scenariuszy)
         for pattern in ["raport_rozszerzony_*.json", "*/raport_rozszerzony_*.json"]:
             for plik in self.wyniki_dir.glob(pattern):
                 try:
@@ -44,6 +47,10 @@ class GeneratorRaportuKoncowego:
                     regulator = raport.get("regulator", "unknown")
                     metoda = raport.get("metoda", "unknown")
                     model = raport.get("model", "unknown")
+                    
+                    # Oznacz jako przetworzoną
+                    klucz = (regulator, metoda, model)
+                    kombinacje_przetworzone.add(klucz)
                     
                     # Pobierz scenariusze z raportu rozszerzonego
                     scenariusze = raport.get("scenariusze", [])
@@ -93,13 +100,69 @@ class GeneratorRaportuKoncowego:
                         "ts": ts_mean,
                         "PASS": procent_pass >= 80,  # Pass jeśli >= 80% scenariuszy zaliczonych
                         "czas_obliczen": None,  # Brak w raportach rozszerzonych
+                        "typ_walidacji": "rozszerzona",
                         "plik": plik.name
                     })
                 except Exception as e:
                     print(f"[UWAGA] Błąd przy czytaniu {plik.name}: {e}")
         
-        print(f"[OK] Zebrano {len(self.dane)} raportów walidacji")
-        return pd.DataFrame(self.dane)
+        print(f"[INFO] Zebrano {len(self.dane)} raportów rozszerzonych (5 scenariuszy każdy)")
+        
+        # KROK 2: Uzupełnij brakujące kombinacje raportami podstawowymi (1 test)
+        for pattern in ["raport_regulator_*.json", "*/raport_regulator_*.json"]:
+            for plik in self.wyniki_dir.glob(pattern):
+                # Pomiń pliki rozszerzone
+                if "rozszerzony" in plik.name:
+                    continue
+                    
+                try:
+                    with open(plik, "r", encoding="utf-8") as f:
+                        raport = json.load(f)
+                    
+                    regulator = raport.get("regulator", "unknown")
+                    metoda = raport.get("metoda", "unknown")
+                    model = raport.get("model", "unknown")
+                    
+                    # Sprawdź czy już mamy tę kombinację z raportu rozszerzonego
+                    klucz = (regulator, metoda, model)
+                    if klucz in kombinacje_przetworzone:
+                        continue  # Pomiń - już mamy lepsze dane
+                    
+                    kombinacje_przetworzone.add(klucz)
+                    
+                    # Pobierz pojedyncze metryki z raportu podstawowego
+                    metryki = raport.get("metryki", {})
+                    
+                    self.dane.append({
+                        "regulator": regulator,
+                        "metoda": metoda,
+                        "model": model,
+                        "IAE": metryki.get("IAE"),
+                        "ISE": metryki.get("ISE"),
+                        "ITAE": metryki.get("ITAE"),
+                        "Mp": metryki.get("przeregulowanie"),
+                        "ts": metryki.get("czas_ustalania"),
+                        "PASS": raport.get("PASS", False),  # PASS z podstawowej walidacji
+                        "czas_obliczen": None,
+                        "typ_walidacji": "podstawowa",
+                        "plik": plik.name
+                    })
+                except Exception as e:
+                    print(f"[UWAGA] Błąd przy czytaniu {plik.name}: {e}")
+        
+        print(f"[OK] Zebrano łącznie {len(self.dane)} raportów walidacji (rozszerzone + podstawowe)")
+        
+        df = pd.DataFrame(self.dane)
+        
+        # Usuń duplikaty - priorytet dla raportów rozszerzonych
+        if not df.empty:
+            # Sortuj żeby rozszerzone były pierwsze
+            df = df.sort_values('typ_walidacji', ascending=False)  # "rozszerzona" > "podstawowa" alfabetycznie
+            # Usuń duplikaty po (regulator, metoda, model)
+            df = df.drop_duplicates(subset=['regulator', 'metoda', 'model'], keep='first')
+            print(f"[INFO] Po deduplikacji: {len(df)} unikalnych kombinacji")
+        
+        return df
     
     def analiza_statystyczna(self, df):
         """Wykonuje analizę statystyczną metod strojenia."""
