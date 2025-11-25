@@ -1,9 +1,0 @@
-{
-  "regulator": "regulator_pi",
-  "metoda": "optymalizacja",
-  "parametry": {
-    "Kp": 1.5,
-    "Ti": 15.0,
-    "Td": null
-  }
-}

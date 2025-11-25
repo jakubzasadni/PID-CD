@@ -1,0 +1,11 @@
+{
+  "regulator": "regulator_pi",
+  "metoda": "optymalizacja",
+  "model": "wahadlo_odwrocone",
+  "parametry": {
+    "Kp": 0.1,
+    "Ti": 30.0,
+    "Td": null
+  },
+  "czas_obliczen_s": 3.4755241870880127
+}

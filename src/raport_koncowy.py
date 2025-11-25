@@ -42,7 +42,11 @@ class GeneratorRaportuKoncowego:
                 try:
                     with open(plik, "r", encoding="utf-8") as f:
                         raport = json.load(f)
-                    
+                except Exception as e:
+                    print(f"[UWAGA] Błąd przy czytaniu {plik.name}: {e}")
+                    continue
+                
+                try:
                     # Wyciągnij informacje z nazwy pliku lub zawartości
                     regulator = raport.get("regulator", "unknown")
                     metoda = raport.get("metoda", "unknown")
@@ -85,9 +89,11 @@ class GeneratorRaportuKoncowego:
                         iae_mean = ise_mean = mp_mean = ts_mean = None
                         pass_rate = 0
                     
-                # Sprawdź czy walidacja przeszła (co najmniej 60% scenariuszy)
-                podsumowanie = raport.get("podsumowanie", {})
-                procent_pass = podsumowanie.get("procent", 0)                    self.dane.append({
+                    # Sprawdź czy walidacja przeszła (co najmniej 60% scenariuszy)
+                    podsumowanie = raport.get("podsumowanie", {})
+                    procent_pass = podsumowanie.get("procent", 0)
+                    
+                    self.dane.append({
                         "regulator": regulator,
                         "metoda": metoda,
                         "model": model,
@@ -102,7 +108,7 @@ class GeneratorRaportuKoncowego:
                         "plik": plik.name
                     })
                 except Exception as e:
-                    print(f"[UWAGA] Błąd przy czytaniu {plik.name}: {e}")
+                    print(f"[UWAGA] Błąd przy przetwarzaniu danych z {plik.name}: {e}")
         
         print(f"[INFO] Zebrano {len(self.dane)} raportów rozszerzonych (5 scenariuszy każdy)")
         

@@ -1,9 +1,0 @@
-{
-  "regulator": "regulator_pd",
-  "metoda": "optymalizacja",
-  "parametry": {
-    "Kp": 15.0,
-    "Ti": null,
-    "Td": 0.1
-  }
-}

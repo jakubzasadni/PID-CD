@@ -1,0 +1,11 @@
+{
+  "regulator": "regulator_pd",
+  "metoda": "ziegler_nichols",
+  "model": "dwa_zbiorniki",
+  "parametry": {
+    "Kp": 3.0,
+    "Ti": null,
+    "Td": 3.75
+  },
+  "czas_obliczen_s": 8.749961853027344e-05
+}

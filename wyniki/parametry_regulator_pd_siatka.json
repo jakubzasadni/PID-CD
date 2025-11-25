@@ -1,9 +1,0 @@
-{
-  "regulator": "regulator_pd",
-  "metoda": "siatka",
-  "parametry": {
-    "Kp": 8.0,
-    "Ti": null,
-    "Td": 0.1
-  }
-}

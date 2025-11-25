@@ -1,0 +1,11 @@
+{
+  "regulator": "regulator_p",
+  "metoda": "optymalizacja",
+  "model": "wahadlo_odwrocone",
+  "parametry": {
+    "Kp": 0.1,
+    "Ti": null,
+    "Td": null
+  },
+  "czas_obliczen_s": 0.6662719249725342
+}
