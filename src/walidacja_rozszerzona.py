@@ -35,7 +35,7 @@ def symuluj_scenariusz(
     RegulatorClass, 
     parametry: Dict, 
     scenariusz: Dict,
-    czas_sym: float = 120.0
+    czas_sym: float = 180.0
 ) -> Dict[str, Any]:
     """
     Wykonuje symulację w danym scenariuszu.
