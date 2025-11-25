@@ -15,12 +15,12 @@ zakresy_parametrow:
     Td: [0.1, 15.0]
   
   dwa_zbiorniki:
-    Kp: [0.1, 20.0]    # Zwiększone z 10.0 - pozwala na lepsze strojenie układu II rzędu
+    Kp: [1.0, 20.0]    # Zwiększony dolny próg z 0.1 do 1.0 - optymalizacja utkwiła w minimum z Kp=0.29
     Ti: [5.0, 100.0]   # Rozszerzony dolny zakres - możliwość szybszej akcji całkującej
     Td: [0.1, 10.0]    # Zwiększone z 5.0 - większy zakres dla akcji różniczkującej
   
   wahadlo_odwrocone:
-    Kp: [0.1, 40.0]
+    Kp: [0.5, 40.0]    # Zwiększony dolny próg z 0.1 do 0.5 - uniknięcie zbyt słabego wzmocnienia
     Ti: [1.0, 30.0]
     Td: [0.05, 10.0]
 
