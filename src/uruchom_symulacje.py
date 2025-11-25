@@ -102,14 +102,18 @@ def uruchom_symulacje():
             print("[UWAGA] Brak plików parametrów w katalogu:", out_dir)
             return
 
-        # --- Wybór zbioru regulatorów ---
+        # --- Wybór zbioru regulatorów i modeli ---
         if regulator_env.lower() == "all":
             regulator_files = pliki_params
         else:
             regulator_files = [p for p in pliki_params if f"parametry_{regulator_env}_" in p]
 
+        # Filtruj po modelu jeśli podano
+        if model_env.lower() != "all":
+            regulator_files = [p for p in regulator_files if p.endswith(f"_{model_env}.json")]
+
         if not regulator_files:
-            print("[UWAGA] Nie znaleziono parametrów dla wskazanego REGULATOR:", regulator_env)
+            print("[UWAGA] Nie znaleziono parametrów dla wskazanego REGULATOR i MODEL:", regulator_env, model_env)
             return
 
         pass_count = 0
@@ -121,115 +125,116 @@ def uruchom_symulacje():
                 blob = json.load(f)
             regulator_nazwa = blob["regulator"]
             metoda = blob["metoda"]
+            model_nazwa = blob.get("model", "zbiornik_1rz")  # Fallback dla starych plików
             parametry = blob["parametry"]
 
-            for model_nazwa in modele:
-                total_count += 1
-                prog = progi_modele[model_nazwa]
-                print(f"\n[SZUKANIE] [{regulator_nazwa} | {metoda}] model {model_nazwa}")
-                print(f"📏 Progi: ts ≤ {prog['ts']}s, IAE ≤ {prog['IAE']}, Mp ≤ {prog['Mp']}%")
+            # Waliduj tylko dla tego konkretnego modelu
+            total_count += 1
+            prog = progi_modele[model_nazwa]
+            print(f"\n[SZUKANIE] [{regulator_nazwa} | {metoda}] model {model_nazwa}")
+            print(f"📏 Progi: ts ≤ {prog['ts']}s, IAE ≤ {prog['IAE']}, Mp ≤ {prog['Mp']}%")
 
-                Model = dynamiczny_import("modele", model_nazwa)
-                Regulator = dynamiczny_import("regulatory", regulator_nazwa)
-                model = Model()
-                dt = model.dt
+            Model = dynamiczny_import("modele", model_nazwa)
+            Regulator = dynamiczny_import("regulatory", regulator_nazwa)
+            model = Model()
+            dt = model.dt
 
-                import inspect
-                sig = inspect.signature(Regulator.__init__)
-                parametry_filtr = {k: v for k, v in parametry.items() if k in sig.parameters}
-                # Usuń limity saturacji - model zadba o fizyczne ograniczenia
-                regulator = Regulator(**parametry_filtr, dt=dt, umin=None, umax=None)
+            import inspect
+            sig = inspect.signature(Regulator.__init__)
+            parametry_filtr = {k: v for k, v in parametry.items() if k in sig.parameters}
+            # Usuń limity saturacji - model zadba o fizyczne ograniczenia
+            regulator = Regulator(**parametry_filtr, dt=dt, umin=None, umax=None)
 
-                kroki = int(czas_sym / dt)
-                t, r, y, u = [], [], [], []
+            kroki = int(czas_sym / dt)
+            t, r, y, u = [], [], [], []
 
-                for k in range(kroki):
-                    t.append(k * dt)
-                    r_zad = 0.0 if model_nazwa == "wahadlo_odwrocone" else 1.0
-                    y_k = model.y
-                    u_k = regulator.update(r_zad, y_k)
-                    y_nowe = model.step(u_k)
-                    r.append(r_zad)
-                    y.append(y_nowe)
-                    u.append(u_k)
+            for k in range(kroki):
+                t.append(k * dt)
+                r_zad = 0.0 if model_nazwa == "wahadlo_odwrocone" else 1.0
+                y_k = model.y
+                u_k = regulator.update(r_zad, y_k)
+                y_nowe = model.step(u_k)
+                r.append(r_zad)
+                y.append(y_nowe)
+                u.append(u_k)
 
-                wyniki = oblicz_metryki(t, r, y, u)
+            wyniki = oblicz_metryki(t, r, y, u)
 
-                pass_gates = True
-                powod = []
-                if np.std(u) < 1e-4:
-                    pass_gates = False
-                    powod.append("brak reakcji regulatora (u ~ const)")
-                if wyniki.przeregulowanie > prog["Mp"]:
-                    pass_gates = False
-                    powod.append("przeregulowanie")
-                if wyniki.czas_ustalania > prog["ts"]:
-                    pass_gates = False
-                    powod.append("czas ustalania")
-                if wyniki.IAE > prog["IAE"]:
-                    pass_gates = False
-                    powod.append("IAE")
+            pass_gates = True
+            powod = []
+            if np.std(u) < 1e-4:
+                pass_gates = False
+                powod.append("brak reakcji regulatora (u ~ const)")
+            if wyniki.przeregulowanie > prog["Mp"]:
+                pass_gates = False
+                powod.append("przeregulowanie")
+            if wyniki.czas_ustalania > prog["ts"]:
+                pass_gates = False
+                powod.append("czas ustalania")
+            if wyniki.IAE > prog["IAE"]:
+                pass_gates = False
+                powod.append("IAE")
 
-                raport = {
-                    "model": model_nazwa,
-                    "regulator": regulator_nazwa,
-                    "metoda": metoda,
-                    "parametry": parametry,
-                    "metryki": wyniki.__dict__,
-                    "progi": prog,
-                    "PASS": pass_gates,
-                    "niezaliczone": powod,
-                }
+            raport = {
+                "model": model_nazwa,
+                "regulator": regulator_nazwa,
+                "metoda": metoda,
+                "parametry": parametry,
+                "metryki": wyniki.__dict__,
+                "progi": prog,
+                "PASS": pass_gates,
+                "niezaliczone": powod,
+            }
 
-                raport_path = os.path.join(out_dir, f"raport_{regulator_nazwa}_{metoda}_{model_nazwa}.json")
-                with open(raport_path, "w") as f:
-                    json.dump(raport, f, indent=2)
+            raport_path = os.path.join(out_dir, f"raport_{regulator_nazwa}_{metoda}_{model_nazwa}.json")
+            with open(raport_path, "w") as f:
+                json.dump(raport, f, indent=2)
 
-                # Tworzenie wykresu z dwoma osiami Y
-                fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), height_ratios=[2, 1])
-                fig.suptitle(f"{regulator_nazwa} / {metoda} — {model_nazwa}\n({'PASS' if pass_gates else 'FAIL'})", fontsize=12)
-                
-                # Górny wykres: odpowiedź układu
-                ax1.plot(t, r, 'k--', label='Wartość zadana (r)', alpha=0.7)
-                ax1.plot(t, y, 'b-', label='Odpowiedź układu (y)', linewidth=2)
-                ax1.set_xlabel('Czas [s]')
-                ax1.set_ylabel('Wartość')
-                ax1.grid(True, alpha=0.3)
-                ax1.legend(loc='upper right')
-                
-                # Dolny wykres: sygnał sterujący
-                ax2.plot(t, u, 'r-', label='Sterowanie (u)', linewidth=1.5)
-                ax2.set_xlabel('Czas [s]')
-                ax2.set_ylabel('Sterowanie')
-                ax2.grid(True, alpha=0.3)
-                ax2.legend(loc='upper right')
-                
-                # Dodanie informacji o metrykach
-                info_text = (
-                    f"IAE: {wyniki.IAE:.2f}\n"
-                    f"Mp: {wyniki.przeregulowanie:.1f}%\n"
-                    f"ts: {wyniki.czas_ustalania:.1f}s\n"
-                    f"tr: {wyniki.czas_narastania:.1f}s"
-                )
-                plt.figtext(0.02, 0.02, info_text, fontsize=8, 
-                          bbox=dict(facecolor='white', alpha=0.8))
-                
-                plt.tight_layout()
-                plt.savefig(os.path.join(out_dir, f"wykres_{regulator_nazwa}_{metoda}_{model_nazwa}.png"), 
-                          dpi=150, bbox_inches='tight')
-                plt.close()
+            # Tworzenie wykresu z dwoma osiami Y
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), height_ratios=[2, 1])
+            fig.suptitle(f"{regulator_nazwa} / {metoda} — {model_nazwa}\n({'PASS' if pass_gates else 'FAIL'})", fontsize=12)
+            
+            # Górny wykres: odpowiedź układu
+            ax1.plot(t, r, 'k--', label='Wartość zadana (r)', alpha=0.7)
+            ax1.plot(t, y, 'b-', label='Odpowiedź układu (y)', linewidth=2)
+            ax1.set_xlabel('Czas [s]')
+            ax1.set_ylabel('Wartość')
+            ax1.grid(True, alpha=0.3)
+            ax1.legend(loc='upper right')
+            
+            # Dolny wykres: sygnał sterujący
+            ax2.plot(t, u, 'r-', label='Sterowanie (u)', linewidth=1.5)
+            ax2.set_xlabel('Czas [s]')
+            ax2.set_ylabel('Sterowanie')
+            ax2.grid(True, alpha=0.3)
+            ax2.legend(loc='upper right')
+            
+            # Dodanie informacji o metrykach
+            info_text = (
+                f"IAE: {wyniki.IAE:.2f}\n"
+                f"Mp: {wyniki.przeregulowanie:.1f}%\n"
+                f"ts: {wyniki.czas_ustalania:.1f}s\n"
+                f"tr: {wyniki.czas_narastania:.1f}s"
+            )
+            plt.figtext(0.02, 0.02, info_text, fontsize=8, 
+                  bbox=dict(facecolor='white', alpha=0.8))
+            
+            plt.tight_layout()
+            plt.savefig(os.path.join(out_dir, f"wykres_{regulator_nazwa}_{metoda}_{model_nazwa}.png"), 
+                      dpi=150, bbox_inches='tight')
+            plt.close()
 
-                status = "[OK]" if pass_gates else "[X]"
-                if pass_gates:
-                    pass_count += 1
-                    print(f"{status} Wyniki:")
-                    print(f"  • IAE={wyniki.IAE:.2f}, ITAE={wyniki.ITAE:.2f}")
-                    print(f"  • Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s, tr={wyniki.czas_narastania:.1f}s")
-                else:
-                    print(f"{status} Wyniki:")
-                    print(f"  • IAE={wyniki.IAE:.2f}, ITAE={wyniki.ITAE:.2f}")
-                    print(f"  • Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s, tr={wyniki.czas_narastania:.1f}s")
-                    print(f"  [X] Niezaliczone kryteria: {', '.join(powod)}")
+            status = "[OK]" if pass_gates else "[X]"
+            if pass_gates:
+                pass_count += 1
+                print(f"{status} Wyniki:")
+                print(f"  • IAE={wyniki.IAE:.2f}, ITAE={wyniki.ITAE:.2f}")
+                print(f"  • Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s, tr={wyniki.czas_narastania:.1f}s")
+            else:
+                print(f"{status} Wyniki:")
+                print(f"  • IAE={wyniki.IAE:.2f}, ITAE={wyniki.ITAE:.2f}")
+                print(f"  • Mp={wyniki.przeregulowanie:.1f}%, ts={wyniki.czas_ustalania:.1f}s, tr={wyniki.czas_narastania:.1f}s")
+                print(f"  [X] Niezaliczone kryteria: {', '.join(powod)}")
 
         print("\n--------------------------------------------------")
         print(f"[ANALIZA] Łącznie PASS: {pass_count}/{total_count} ({100*pass_count/total_count:.1f}%)")
@@ -243,25 +248,21 @@ def uruchom_symulacje():
             print("🔬 Uruchamiam rozszerzoną walidację (wiele scenariuszy)...")
             print("="*60)
 
-            # Waliduj tylko kombinacje (regulator, metoda, model), które przeszły podstawową walidację
-            passed_keys = set()
-            for model_nazwa in modele:
-                for plik in sorted(os.listdir(out_dir)):
-                    if plik.startswith("raport_") and plik.endswith(f"_{model_nazwa}.json") and "rozszerzony" not in plik:
-                        with open(os.path.join(out_dir, plik), "r") as f:
-                            rb = json.load(f)
-                        if rb.get("PASS", False):
-                            passed_keys.add((rb.get("regulator"), rb.get("metoda"), model_nazwa))
-
+            # Waliduj tylko kombinacje które przeszły podstawową walidację
             for plik in sorted(regulator_files):
                 with open(os.path.join(out_dir, plik), "r") as f:
                     blob = json.load(f)
                 regulator_nazwa = blob["regulator"]
                 metoda = blob["metoda"]
+                model_nazwa = blob.get("model", "zbiornik_1rz")
                 parametry = blob["parametry"]
 
-                for model_nazwa in modele:
-                    if (regulator_nazwa, metoda, model_nazwa) in passed_keys:
+                # Sprawdź czy przeszła podstawową walidację
+                raport_path = os.path.join(out_dir, f"raport_{regulator_nazwa}_{metoda}_{model_nazwa}.json")
+                if os.path.exists(raport_path):
+                    with open(raport_path, "r") as f:
+                        rb = json.load(f)
+                    if rb.get("PASS", False):
                         walidacja_rozszerzona(regulator_nazwa, metoda, model_nazwa, parametry, out_dir)
                     else:
                         print(f"  [SKIP] Pomijam rozszerzoną walidację dla {regulator_nazwa} / {metoda} / {model_nazwa} (FAIL w podstawowej walidacji)")

@@ -291,9 +291,9 @@ def wykonaj_strojenie(metoda="ziegler_nichols", model_nazwa="zbiornik_1rz"):
 
     # --- 3) Zapisz JSON + raport HTML ---
     meta = {"regulator": regulator_nazwa, "metoda": metoda, "model": model_nazwa, "czas_obliczen_s": czas_obliczen_s}
-    out = {"regulator": regulator_nazwa, "metoda": metoda, "parametry": params, "czas_obliczen_s": czas_obliczen_s}
+    out = {"regulator": regulator_nazwa, "metoda": metoda, "model": model_nazwa, "parametry": params, "czas_obliczen_s": czas_obliczen_s}
 
-    json_path = os.path.join(out_dir, f"parametry_{regulator_nazwa}_{metoda}.json")
+    json_path = os.path.join(out_dir, f"parametry_{regulator_nazwa}_{metoda}_{model_nazwa}.json")
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2)
     print(f" Zapisano parametry: {json_path}")
