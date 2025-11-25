@@ -41,10 +41,22 @@ def uruchom_symulacje():
     model_env = os.getenv("MODEL", None)
     os.makedirs(out_dir, exist_ok=True)
 
+    # Pobierz progi walidacji z config.yaml (v2.1)
+    from src.konfig import pobierz_konfiguracje
+    config = pobierz_konfiguracje()
+    progi_config = config.pobierz_progi_walidacji()
+    
+    # Ujednolicone progi dla wszystkich modeli z config.yaml
     progi_modele = {
-        "zbiornik_1rz": {"ts": 120.0, "IAE": 50.0, "Mp": 15.0},
-        "dwa_zbiorniki": {"ts": 120.0, "IAE": 80.0, "Mp": 20.0},
-        "wahadlo_odwrocone": {"ts": 120.0, "IAE": 10.0, "Mp": 50.0},
+        "zbiornik_1rz": {"ts": progi_config["czas_ustalania_max"], 
+                         "IAE": progi_config["IAE_max"], 
+                         "Mp": progi_config["przeregulowanie_max"]},
+        "dwa_zbiorniki": {"ts": progi_config["czas_ustalania_max"], 
+                          "IAE": progi_config["IAE_max"], 
+                          "Mp": progi_config["przeregulowanie_max"]},
+        "wahadlo_odwrocone": {"ts": progi_config["czas_ustalania_max"], 
+                              "IAE": progi_config["IAE_max"], 
+                              "Mp": progi_config["przeregulowanie_max"]},
     }
     modele = [model_env] if model_env else list(progi_modele.keys())
 
