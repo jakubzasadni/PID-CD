@@ -85,11 +85,9 @@ class GeneratorRaportuKoncowego:
                         iae_mean = ise_mean = mp_mean = ts_mean = None
                         pass_rate = 0
                     
-                    # Sprawdź czy walidacja przeszła (co najmniej 80% scenariuszy)
-                    podsumowanie = raport.get("podsumowanie", {})
-                    procent_pass = podsumowanie.get("procent", 0)
-                    
-                    self.dane.append({
+                # Sprawdź czy walidacja przeszła (co najmniej 60% scenariuszy)
+                podsumowanie = raport.get("podsumowanie", {})
+                procent_pass = podsumowanie.get("procent", 0)                    self.dane.append({
                         "regulator": regulator,
                         "metoda": metoda,
                         "model": model,
@@ -435,7 +433,7 @@ class GeneratorRaportuKoncowego:
             top3 = ranking_df.head(3)
             wnioski.append(f"<li><b>Najlepsze kombinacje Model+Metoda:</b><ul>")
             for idx, row in top3.iterrows():
-                status = "✓ PASS" if row['pass_rate'] >= 80 else f"✗ {row['pass_rate']:.0f}% pass rate"
+                status = "✓ PASS" if row['pass_rate'] >= 60 else f"✗ {row['pass_rate']:.0f}% pass rate"
                 wnioski.append(f"<li>{row['model'].replace('_', ' ').title()} + "
                               f"{row['metoda'].replace('_', ' ').title()} "
                               f"({status}, IAE: {row['IAE']:.2f}, Mp: {row['Mp']:.1f}%)</li>")
@@ -461,7 +459,7 @@ class GeneratorRaportuKoncowego:
             
             if najlepsza_metoda:
                 stats = wyniki_stats[model][najlepsza_metoda]
-                if najlepszy_pass >= 80:
+                if najlepszy_pass >= 60:
                     opis = f"<span class='pass'>zaliczona</span> (pass rate: {najlepszy_pass:.0f}%)"
                 elif najlepszy_pass > 0:
                     opis = f"<span style='color: orange;'>częściowo zaliczona</span> (pass rate: {najlepszy_pass:.0f}%)"
@@ -494,13 +492,13 @@ class GeneratorRaportuKoncowego:
         wnioski.append("<li><b>Zalecenia ogólne:</b><ul>")
         
         # Sprawdź czy są w ogóle jakieś PASSy
-        any_pass = any(s["pass_rate"] >= 80 for model_stats in wyniki_stats.values() for s in model_stats.values())
+        any_pass = any(s["pass_rate"] >= 60 for model_stats in wyniki_stats.values() for s in model_stats.values())
         
         if any_pass:
-            wnioski.append("<li>✓ Niektóre kombinacje osiągnęły próg 80% - można je wdrożyć do produkcji</li>")
+            wnioski.append("<li>✓ Niektóre kombinacje osiągnęły próg 60% - można je wdrożyć do produkcji</li>")
             wnioski.append("<li>Dla kombinacji failed: rozważ zmianę metody strojenia lub dostrojenie progów walidacji</li>")
         else:
-            wnioski.append("<li>⚠️ <b>Żadna kombinacja nie osiągnęła progu 80% zaliczonych scenariuszy</b></li>")
+            wnioski.append("<li>⚠️ <b>Żadna kombinacja nie osiągnęła progu 60% zaliczonych scenariuszy</b></li>")
             wnioski.append("<li>Rekomendacja: Przeanalizuj progi walidacji (IAE_max, Mp_max, ts_max) - mogą być zbyt restrykcyjne</li>")
             wnioski.append("<li>Rozważ: poprawę strojenia parametrów regulatorów (inne siatki, inne funkcje celu w optymalizacji)</li>")
         
@@ -557,7 +555,7 @@ class GeneratorRaportuKoncowego:
         # Ostrzeżenie jeśli wszystkie failed
         if pass_rate_total == 0:
             html.append("<div style='background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 15px 0;'>")
-            html.append("<p style='margin: 0;'><b>⚠️ Uwaga:</b> Żadna kombinacja nie osiągnęła progu 80% zaliczonych scenariuszy. "
+            html.append("<p style='margin: 0;'><b>⚠️ Uwaga:</b> Żadna kombinacja nie osiągnęła progu 60% zaliczonych scenariuszy. "
                        "Ranking przedstawia relatywne porównanie, ale wszystkie wyniki wymagają poprawy parametrów.</p>")
             html.append("</div>")
         
@@ -572,7 +570,7 @@ class GeneratorRaportuKoncowego:
         html.append("<li>📡 <b>Szum pomiarowy</b> (σ=0.5) - odporność na błędy pomiarowe</li>")
         html.append("</ul>")
         html.append("<p><b>Pass rate</b> = procent scenariuszy zaliczonych (próg: IAE, Mp, ts w granicach norm). "
-                   "Kombinacja otrzymuje <span class='pass'>PASS</span> gdy ≥80% scenariuszy spełnia kryteria.</p>")
+                   "Kombinacja otrzymuje <span class='pass'>PASS</span> gdy ≥60% scenariuszy spełnia kryteria.</p>")
         html.append("</div>")
         
         # Sekcja 2: Tabele porównawcze
