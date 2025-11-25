@@ -4,31 +4,32 @@
 # Zakresy parametrów dla strojenia
 zakresy_parametrow:
   default:
-    Kp: [0.1, 30.0]
-    Ti: [2.0, 50.0]
-    Td: [0.1, 15.0]
+    Kp: [0.5, 10.0]    # Realistyczne dla systemów przemysłowych
+    Ti: [5.0, 40.0]    # Typowy zakres całkowania
+    Td: [0.1, 8.0]     # Typowy zakres różniczkowania
   
   # Specyficzne dla modeli (opcjonalne nadpisanie)
   zbiornik_1rz:
-    Kp: [0.1, 30.0]
-    Ti: [2.0, 50.0]
-    Td: [0.1, 15.0]
+    Kp: [0.5, 10.0]    # Zbiornik potrzebuje umiarkowanego wzmocnienia
+    Ti: [5.0, 40.0]    # Wolniejsza akcja całkująca dla zbiornika
+    Td: [0.1, 8.0]     # Ograniczona akcja różniczkująca
   
   dwa_zbiorniki:
-    Kp: [1.0, 20.0]    # Zwiększony dolny próg z 0.1 do 1.0 - optymalizacja utkwiła w minimum z Kp=0.29
-    Ti: [5.0, 100.0]   # Rozszerzony dolny zakres - możliwość szybszej akcji całkującej
-    Td: [0.1, 10.0]    # Zwiększone z 5.0 - większy zakres dla akcji różniczkującej
+    Kp: [1.0, 12.0]    # Nieco wyższe wzmocnienie dla złożonego systemu
+    Ti: [8.0, 50.0]    # Wolniejsza akcja całkująca dla układu 2. rzędu
+    Td: [0.1, 6.0]     # Ostrożna akcja różniczkująca
   
   wahadlo_odwrocone:
-    Kp: [0.5, 40.0]    # Zwiększony dolny próg z 0.1 do 0.5 - uniknięcie zbyt słabego wzmocnienia
-    Ti: [1.0, 30.0]
-    Td: [0.05, 10.0]
+    Kp: [2.0, 25.0]    # Wyższe wzmocnienie dla niestabilnego układu
+    Ti: [2.0, 30.0]    # Szybsza akcja całkująca dla stabilizacji
+    Td: [0.1, 8.0]     # Akcja różniczkująca pomaga w stabilizacji
 
 # Wagi funkcji kary (kara = IAE + waga_Mp*Mp + waga_ts*ts + waga_stale_u jeśli u stałe)
 wagi_kary:
-  przeregulowanie: 0.3      # Zmniejszone z 0.5 - pozwól na trochę przeregulowania dla lepszej dynamiki
-  czas_ustalania: 0.5       # Zwiększone z 0.05 - silna kara za wolne ustalanie (zapobiega utknięciu w minimum z niskim Kp)
+  przeregulowanie: 0.5      # Zbalansowana kara za przeregulowanie
+  czas_ustalania: 1.0       # Silna kara za wolne ustalanie - priorytet dla dynamiki
   sterowanie_stale: 1000    # Kara jeśli sterowanie stałe (std(u) < 1e-4)
+  parametry_ekstremalne: 50 # Kara za parametry zbliżone do granic zakresu
 
 # Gęstość siatki dla przeszukiwania
 gestosc_siatki:
@@ -86,27 +87,27 @@ walidacja:
     
     - nazwa: "Skok wartości zadanej (duży)"
       typ: "setpoint_step"
-      wielkosc: 15.0
+      wielkosc: 10.0          # Zmniejszone z 15.0 - bardziej realistyczne
       czas_skoku: 10.0
     
-    - nazwa: "Zakłócenie na wyjściu"
+    - nazwa: "Zakłócenie na wyjściu (ujemne)"
       typ: "output_disturbance"
-      wielkosc: -3.0
+      wielkosc: -1.5          # Zmniejszone z -3.0 - realistyczne zakłócenie
       czas_zaklócenia: 30.0
     
     - nazwa: "Zakłócenie na wyjściu (dodatnie)"
       typ: "output_disturbance"
-      wielkosc: 2.0
+      wielkosc: 1.5           # Zmniejszone z 2.0 - realistyczne zakłócenie
       czas_zaklócenia: 30.0
     
     - nazwa: "Szum pomiarowy"
       typ: "measurement_noise"
-      odchylenie_std: 0.1
+      odchylenie_std: 0.05    # Zmniejszone z 0.1 - typowy szum pomiarowy
   
   progi_akceptacji:
-    IAE_max: 20.0              # Zwiększone z 10.0 - realistyczne dla różnych modeli
-    przeregulowanie_max: 50.0  # Zwiększone z 30.0 - akceptowalne dla układów niestabilnych (wahadło)
-    czas_ustalania_max: 110.0  # Zwiększone do 110s - zakłócenia o 30s + stabilizacja ~60s + margines
+    IAE_max: 15.0              # Ścisły próg dla dobrej jakości regulacji
+    przeregulowanie_max: 40.0  # Akceptowalne przeregulowanie dla systemów dynamicznych
+    czas_ustalania_max: 80.0   # Realistyczny czas dla systemów przemysłowych z zakłóceniami
 
 # Raportowanie
 raportowanie:

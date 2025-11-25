@@ -57,7 +57,7 @@ def symuluj_scenariusz(
     import inspect
     sig = inspect.signature(RegulatorClass.__init__)
     parametry_filtr = {k: v for k, v in parametry.items() if k in sig.parameters and v is not None}
-    regulator = RegulatorClass(**parametry_filtr, dt=dt, umin=None, umax=None)
+    regulator = RegulatorClass(**parametry_filtr, dt=dt, umin=-10.0, umax=10.0)
     
     kroki = int(czas_sym / dt)
     t, r, y, u = [], [], [], []

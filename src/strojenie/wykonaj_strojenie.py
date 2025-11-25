@@ -56,8 +56,8 @@ def _uruchom_symulacje_testowa(RegulatorClass, parametry: dict, model_nazwa: str
         
         # Dla strojenia: usuń limity saturacji (umin, umax) żeby regulator mógł swobodnie działać
         # Model sam zadba o fizyczne ograniczenia
-        # Stwórz regulator z parametrami
-        regulator = RegulatorClass(**parametry_filtr, dt=dt, umin=None, umax=None)
+        # Stwórz regulator z parametrami - UWAGA: Dla przemysłu dodaj realistyczne limity
+        regulator = RegulatorClass(**parametry_filtr, dt=dt, umin=-10.0, umax=10.0)
         
         # Symulacja
         kroki = int(czas_sym / dt)
@@ -85,11 +85,14 @@ def _uruchom_symulacje_testowa(RegulatorClass, parametry: dict, model_nazwa: str
             from konfig import pobierz_konfiguracje
             cfg = pobierz_konfiguracje()
             wagi = cfg.pobierz_wagi_kary()
+            zakresy = cfg.pobierz_zakresy_parametrow(model_nazwa)
             w_mp = float(wagi.get('przeregulowanie', 0.5))
-            w_ts = float(wagi.get('czas_ustalania', 0.01))
+            w_ts = float(wagi.get('czas_ustalania', 1.0))
             w_const = float(wagi.get('sterowanie_stale', 1000))
+            w_extreme = float(wagi.get('parametry_ekstremalne', 50))
         except Exception:
-            w_mp, w_ts, w_const = 0.5, 0.01, 1000.0
+            w_mp, w_ts, w_const, w_extreme = 0.5, 1.0, 1000.0, 50.0
+            zakresy = {}
 
         # Funkcja kary (niższa = lepsza)
         # Priorytet: IAE + kara za przeregulowanie + kara za wolne ustalanie
@@ -98,6 +101,30 @@ def _uruchom_symulacje_testowa(RegulatorClass, parametry: dict, model_nazwa: str
         # Dodatkowa kara za niestabilność (jeśli regulator nie reaguje)
         if np.std(u) < 1e-4:
             kara += w_const
+        
+        # Kara za parametry zbliżone do granic zakresu (preferuj wartości środkowe)
+        if zakresy:
+            kp = parametry.get('Kp', 0)
+            ti = parametry.get('Ti', None)
+            td = parametry.get('Td', None)
+            
+            # Penalizuj Kp bliskie górnej granicy (>80% zakresu)
+            if 'Kp' in zakresy:
+                kp_min, kp_max = zakresy['Kp']
+                if kp > kp_min + 0.8 * (kp_max - kp_min):
+                    kara += w_extreme * ((kp - (kp_min + 0.8*(kp_max - kp_min))) / (0.2*(kp_max - kp_min)))
+            
+            # Penalizuj Ti bliskie górnej granicy (>80% zakresu) 
+            if ti and 'Ti' in zakresy:
+                ti_min, ti_max = zakresy['Ti']
+                if ti > ti_min + 0.8 * (ti_max - ti_min):
+                    kara += w_extreme * ((ti - (ti_min + 0.8*(ti_max - ti_min))) / (0.2*(ti_max - ti_min)))
+            
+            # Penalizuj Td bliskie górnej granicy (>80% zakresu)
+            if td and 'Td' in zakresy:
+                td_min, td_max = zakresy['Td']
+                if td > td_min + 0.8 * (td_max - td_min):
+                    kara += w_extreme * ((td - (td_min + 0.8*(td_max - td_min))) / (0.2*(td_max - td_min)))
         
         return wyniki, kara
         

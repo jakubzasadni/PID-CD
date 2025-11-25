@@ -143,7 +143,7 @@ def uruchom_symulacje():
             sig = inspect.signature(Regulator.__init__)
             parametry_filtr = {k: v for k, v in parametry.items() if k in sig.parameters}
             # Usuń limity saturacji - model zadba o fizyczne ograniczenia
-            regulator = Regulator(**parametry_filtr, dt=dt, umin=None, umax=None)
+            regulator = Regulator(**parametry_filtr, dt=dt, umin=-10.0, umax=10.0)
 
             kroki = int(czas_sym / dt)
             t, r, y, u = [], [], [], []

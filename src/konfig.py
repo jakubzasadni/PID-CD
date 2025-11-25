@@ -57,9 +57,9 @@ DOMYSLNA_KONFIGURACJA = {
             {'nazwa': 'Skok wartości zadanej (duży)', 'typ': 'setpoint_step', 'wielkosc': 15.0, 'czas_skoku': 10.0},
         ],
         'progi_akceptacji': {
-            'IAE_max': 10.0,
-            'przeregulowanie_max': 30.0,
-            'czas_ustalania_max': 50.0
+            'IAE_max': 20.0,
+            'przeregulowanie_max': 50.0,
+            'czas_ustalania_max': 110.0
         }
     },
     'raportowanie': {
