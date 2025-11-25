@@ -27,7 +27,7 @@ zakresy_parametrow:
 # Wagi funkcji kary (kara = IAE + waga_Mp*Mp + waga_ts*ts + waga_stale_u jeśli u stałe)
 wagi_kary:
   przeregulowanie: 0.3      # Zmniejszone z 0.5 - pozwól na trochę przeregulowania dla lepszej dynamiki
-  czas_ustalania: 0.05      # Zwiększone z 0.01 - czas ustalania też jest ważny (balans)
+  czas_ustalania: 0.5       # Zwiększone z 0.05 - silna kara za wolne ustalanie (zapobiega utknięciu w minimum z niskim Kp)
   sterowanie_stale: 1000    # Kara jeśli sterowanie stałe (std(u) < 1e-4)
 
 # Gęstość siatki dla przeszukiwania
