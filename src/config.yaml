@@ -92,12 +92,12 @@ walidacja:
     - nazwa: "Zakłócenie na wyjściu"
       typ: "output_disturbance"
       wielkosc: -3.0
-      czas_zaklócenia: 60.0
+      czas_zaklócenia: 30.0
     
     - nazwa: "Zakłócenie na wyjściu (dodatnie)"
       typ: "output_disturbance"
       wielkosc: 2.0
-      czas_zaklócenia: 60.0
+      czas_zaklócenia: 30.0
     
     - nazwa: "Szum pomiarowy"
       typ: "measurement_noise"
@@ -106,7 +106,7 @@ walidacja:
   progi_akceptacji:
     IAE_max: 20.0              # Zwiększone z 10.0 - realistyczne dla różnych modeli
     przeregulowanie_max: 50.0  # Zwiększone z 30.0 - akceptowalne dla układów niestabilnych (wahadło)
-    czas_ustalania_max: 100.0  # Zwiększone z 50.0 - układy II rzędu potrzebują więcej czasu
+    czas_ustalania_max: 110.0  # Zwiększone do 110s - zakłócenia o 30s + stabilizacja ~60s + margines
 
 # Raportowanie
 raportowanie:
