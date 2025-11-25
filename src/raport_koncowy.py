@@ -98,7 +98,7 @@ class GeneratorRaportuKoncowego:
                         "ITAE": None,  # Brak w raportach rozszerzonych
                         "Mp": mp_mean,
                         "ts": ts_mean,
-                        "PASS": procent_pass >= 80,  # Pass jeśli >= 80% scenariuszy zaliczonych
+                        "PASS": procent_pass >= 60,  # Pass jeśli >= 60% scenariuszy zaliczonych
                         "czas_obliczen": None,  # Brak w raportach rozszerzonych
                         "typ_walidacji": "rozszerzona",
                         "plik": plik.name

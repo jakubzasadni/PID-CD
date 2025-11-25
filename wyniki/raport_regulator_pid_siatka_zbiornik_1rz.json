@@ -16,9 +16,9 @@
     "czas_narastania": 0.8740617643360155
   },
   "progi": {
-    "IAE_max": 20.0,
-    "przeregulowanie_max": 50.0,
-    "czas_ustalania_max": 100.0
+    "ts": 100.0,
+    "IAE": 20.0,
+    "Mp": 50.0
   },
   "PASS": true,
   "niezaliczone": []
