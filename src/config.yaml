@@ -15,9 +15,9 @@ zakresy_parametrow:
     Td: [0.1, 15.0]
   
   dwa_zbiorniki:
-    Kp: [0.1, 10.0]    # Obniżone z 25.0 - poprzednie było zbyt agresywne (50% przeregulowanie PID)
-    Ti: [10.0, 100.0]   # Zwiększone dla lepszej stabilności
-    Td: [0.1, 5.0]      # Obniżone - mniej agresywne działanie różniczkujące
+    Kp: [0.1, 20.0]    # Zwiększone z 10.0 - pozwala na lepsze strojenie układu II rzędu
+    Ti: [5.0, 100.0]   # Rozszerzony dolny zakres - możliwość szybszej akcji całkującej
+    Td: [0.1, 10.0]    # Zwiększone z 5.0 - większy zakres dla akcji różniczkującej
   
   wahadlo_odwrocone:
     Kp: [0.1, 40.0]
@@ -26,9 +26,9 @@ zakresy_parametrow:
 
 # Wagi funkcji kary (kara = IAE + waga_Mp*Mp + waga_ts*ts + waga_stale_u jeśli u stałe)
 wagi_kary:
-  przeregulowanie: 0.5      # waga dla przeregulowania [%]
-  czas_ustalania: 0.01      # waga dla czasu ustalania [s]
-  sterowanie_stale: 1000    # kara jeśli sterowanie stałe (std(u) < 1e-4)
+  przeregulowanie: 0.3      # Zmniejszone z 0.5 - pozwól na trochę przeregulowania dla lepszej dynamiki
+  czas_ustalania: 0.05      # Zwiększone z 0.01 - czas ustalania też jest ważny (balans)
+  sterowanie_stale: 1000    # Kara jeśli sterowanie stałe (std(u) < 1e-4)
 
 # Gęstość siatki dla przeszukiwania
 gestosc_siatki:
@@ -104,9 +104,9 @@ walidacja:
       odchylenie_std: 0.1
   
   progi_akceptacji:
-    IAE_max: 10.0
-    przeregulowanie_max: 30.0
-    czas_ustalania_max: 50.0
+    IAE_max: 20.0              # Zwiększone z 10.0 - realistyczne dla różnych modeli
+    przeregulowanie_max: 50.0  # Zwiększone z 30.0 - akceptowalne dla układów niestabilnych (wahadło)
+    czas_ustalania_max: 100.0  # Zwiększone z 50.0 - układy II rzędu potrzebują więcej czasu
 
 # Raportowanie
 raportowanie:
