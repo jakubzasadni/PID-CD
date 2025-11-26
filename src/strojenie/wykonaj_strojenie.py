@@ -57,7 +57,7 @@ def _uruchom_symulacje_testowa(RegulatorClass, parametry: dict, model_nazwa: str
         # Dla strojenia: usuń limity saturacji (umin, umax) żeby regulator mógł swobodnie działać
         # Model sam zadba o fizyczne ograniczenia
         # Stwórz regulator z parametrami - UWAGA: Dla przemysłu dodaj realistyczne limity
-        regulator = RegulatorClass(**parametry_filtr, dt=dt, umin=-10.0, umax=10.0)
+        regulator = RegulatorClass(**parametry_filtr, dt=dt, umin=-15.0, umax=15.0)
         
         # Symulacja
         kroki = int(czas_sym / dt)

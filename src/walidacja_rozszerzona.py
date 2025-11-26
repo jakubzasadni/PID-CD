@@ -57,7 +57,7 @@ def symuluj_scenariusz(
     import inspect
     sig = inspect.signature(RegulatorClass.__init__)
     parametry_filtr = {k: v for k, v in parametry.items() if k in sig.parameters and v is not None}
-    regulator = RegulatorClass(**parametry_filtr, dt=dt, umin=-10.0, umax=10.0)
+    regulator = RegulatorClass(**parametry_filtr, dt=dt, umin=-15.0, umax=15.0)
     
     kroki = int(czas_sym / dt)
     t, r, y, u = [], [], [], []
@@ -119,8 +119,9 @@ def symuluj_scenariusz(
         y.append(y_nowe)
         u.append(u_k)
     
-    # Oblicz metryki
-    metryki = oblicz_metryki(t, r, y, u)
+    # Oblicz metryki - dla szumu użyj większego pasma tolerancji
+    settle_band = 0.05 if typ_scenariusza == 'measurement_noise' else 0.02
+    metryki = oblicz_metryki(t, r, y, u, settle_band=settle_band)
     
     return {
         't': t,

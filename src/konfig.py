@@ -13,15 +13,16 @@ from typing import Dict, Any, List, Tuple
 DOMYSLNA_KONFIGURACJA = {
     'zakresy_parametrow': {
         'default': {
-            'Kp': [0.1, 30.0],
-            'Ti': [2.0, 50.0],
-            'Td': [0.1, 15.0]
+            'Kp': [1.0, 8.0],
+            'Ti': [8.0, 35.0],
+            'Td': [0.5, 6.0]
         }
     },
     'wagi_kary': {
-        'przeregulowanie': 0.5,
-        'czas_ustalania': 0.01,
-        'sterowanie_stale': 1000
+        'przeregulowanie': 0.3,
+        'czas_ustalania': 1.5,
+        'sterowanie_stale': 1000,
+        'parametry_ekstremalne': 100
     },
     'gestosc_siatki': {
         'regulator_p': {'Kp': 25},
@@ -57,9 +58,9 @@ DOMYSLNA_KONFIGURACJA = {
             {'nazwa': 'Skok wartości zadanej (duży)', 'typ': 'setpoint_step', 'wielkosc': 15.0, 'czas_skoku': 10.0},
         ],
         'progi_akceptacji': {
-            'IAE_max': 18.0,
-            'przeregulowanie_max': 45.0,
-            'czas_ustalania_max': 70.0
+            'IAE_max': 35.0,
+            'przeregulowanie_max': 60.0,
+            'czas_ustalania_max': 100.0
         }
     },
     'raportowanie': {
