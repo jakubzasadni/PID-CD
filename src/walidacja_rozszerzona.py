@@ -256,6 +256,22 @@ def walidacja_rozszerzona(
     
     print(f"   Zapisano raport: {raport_path}")
     
+    # Aktualizuj plik parametry_*.json z wynikami walidacji
+    param_path = os.path.join(katalog_wyniki, f"parametry_{regulator_nazwa}_{metoda}_{model_nazwa}.json")
+    if os.path.exists(param_path):
+        with open(param_path, 'r', encoding='utf-8') as f:
+            param_data = json.load(f)
+        
+        # Dodaj wyniki walidacji do pliku parametrów
+        param_data['pass_rate'] = procent_pass / 100.0
+        param_data['scenariusze'] = raport['scenariusze']
+        param_data['podsumowanie'] = raport['podsumowanie']
+        
+        with open(param_path, 'w', encoding='utf-8') as f:
+            json.dump(param_data, f, indent=2)
+        
+        print(f"   Zaktualizowano parametry: {param_path}")
+    
     return raport
 
 

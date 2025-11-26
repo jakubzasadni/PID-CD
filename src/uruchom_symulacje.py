@@ -248,7 +248,7 @@ def uruchom_symulacje():
             print("🔬 Uruchamiam rozszerzoną walidację (wiele scenariuszy)...")
             print("="*60)
 
-            # Waliduj tylko kombinacje które przeszły podstawową walidację
+            # Waliduj kombinacje
             for plik in sorted(regulator_files):
                 with open(os.path.join(out_dir, plik), "r") as f:
                     blob = json.load(f)
@@ -257,15 +257,19 @@ def uruchom_symulacje():
                 model_nazwa = blob.get("model", "zbiornik_1rz")
                 parametry = blob["parametry"]
 
-                # Sprawdź czy przeszła podstawową walidację
-                raport_path = os.path.join(out_dir, f"raport_{regulator_nazwa}_{metoda}_{model_nazwa}.json")
-                if os.path.exists(raport_path):
-                    with open(raport_path, "r") as f:
-                        rb = json.load(f)
-                    if rb.get("PASS", False):
-                        walidacja_rozszerzona(regulator_nazwa, metoda, model_nazwa, parametry, out_dir)
-                    else:
-                        print(f"  [SKIP] Pomijam rozszerzoną walidację dla {regulator_nazwa} / {metoda} / {model_nazwa} (FAIL w podstawowej walidacji)")
+                # W trybie strojenie: sprawdź czy przeszła podstawową walidację
+                # W trybie walidacja: uruchom dla wszystkich
+                if TRYB == "strojenie":
+                    raport_path = os.path.join(out_dir, f"raport_{regulator_nazwa}_{metoda}_{model_nazwa}.json")
+                    if os.path.exists(raport_path):
+                        with open(raport_path, "r") as f:
+                            rb = json.load(f)
+                        if not rb.get("PASS", False):
+                            print(f"  [SKIP] Pomijam rozszerzoną walidację dla {regulator_nazwa} / {metoda} / {model_nazwa} (FAIL w podstawowej walidacji)")
+                            continue
+                
+                # Uruchom rozszerzoną walidację
+                walidacja_rozszerzona(regulator_nazwa, metoda, model_nazwa, parametry, out_dir)
 
         except Exception as e:
             print(f"[UWAGA] Rozszerzona walidacja nie powiodła się: {e}")
