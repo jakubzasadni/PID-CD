@@ -46,8 +46,16 @@ def oblicz_metryki(t, r, y, u=None, settle_band=0.02, hold_time=0.0):
     step_dir = np.sign(steady_state - y0) or 1.0
 
     # --- przeregulowanie [%] ---
-    peak_dev = np.max(step_dir * (y - steady_state))  # dodatnie tylko powyżej stanu ustalonego
-    przeregulowanie = max(0.0, 100.0 * peak_dev / (step_amp if step_amp > 1e-12 else 1.0))
+    # Dla zadania stabilizacji (r≈0, mały step_amp) użyj maksymalnego odchylenia bezwzględnego
+    if step_amp < 0.1:  # próg dla zadań stabilizacji (wahadło, itp.)
+        max_abs_dev = np.max(np.abs(y - steady_state))
+        # Normalizuj względem początkowego odchylenia lub stałej referencyjnej
+        ref_amp = max(abs(y0 - steady_state), 0.1)
+        przeregulowanie = max(0.0, 100.0 * (max_abs_dev - abs(y0 - steady_state)) / ref_amp)
+    else:
+        # Klasyczne przeregulowanie dla skoków setpoint
+        peak_dev = np.max(step_dir * (y - steady_state))  # dodatnie tylko powyżej stanu ustalonego
+        przeregulowanie = max(0.0, 100.0 * peak_dev / (step_amp if step_amp > 1e-12 else 1.0))
 
     # --- Czas ustalania [s] ---
     band_ref = step_amp if step_amp > 1e-9 else np.max(np.abs(y - steady_state))

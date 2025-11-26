@@ -122,12 +122,12 @@ def _uruchom_symulacje_testowa(RegulatorClass, parametry: dict, model_nazwa: str
                     przekroczenie = (ti - (ti_min + 0.7*(ti_max - ti_min))) / (0.3*(ti_max - ti_min))
                     kara += w_extreme * przekroczenie * przekroczenie  # Kara kwadratowa
             
-            # Penalizuj Td bliskie DOLNEJ granicy (<30% zakresu) - chcemy WYŻSZYCH wartości Td
+            # Penalizuj Td bliskie DOLNEJ granicy (<20% zakresu) - chcemy WYŻSZYCH wartości Td
             if td and 'Td' in zakresy:
                 td_min, td_max = zakresy['Td']
-                if td < td_min + 0.3 * (td_max - td_min):
-                    przekroczenie = ((td_min + 0.3*(td_max - td_min)) - td) / (0.3*(td_max - td_min))
-                    kara += w_extreme * przekroczenie * przekroczenie  # Kara kwadratowa za NISKIE Td
+                if td < td_min + 0.2 * (td_max - td_min):
+                    przekroczenie = ((td_min + 0.2*(td_max - td_min)) - td) / (0.2*(td_max - td_min))
+                    kara += 2.0 * w_extreme * przekroczenie * przekroczenie  # Podwójna kara za NISKIE Td
         
         return wyniki, kara
         

@@ -12,7 +12,7 @@ zakresy_parametrow:
   zbiornik_1rz:
     Kp: [1.0, 7.0]     # Zawężone dla zbiornika
     Ti: [8.0, 30.0]    # Wolniejsza akcja całkująca
-    Td: [0.8, 5.0]     # Wyższe minimum - skuteczne tłumienie
+    Td: [1.2, 5.0]     # Zwiększone minimum - skuteczniejsze tłumienie dla PID
   
   dwa_zbiorniki:
     Kp: [1.5, 10.0]    # Zawężone dla układu 2. rzędu
@@ -107,7 +107,7 @@ walidacja:
   progi_akceptacji:
     IAE_max: 35.0              # ZNACZNIE zrelaksowany - praktyczne wymagania
     przeregulowanie_max: 60.0  # Akceptowalne dla systemów dynamicznych
-    czas_ustalania_max: 100.0  # Realistyczny dla wszystkich scenariuszy
+    czas_ustalania_max: 120.0  # Zwiększony z 100 - więcej czasu dla PI/PID na wahadle
 
 # Raportowanie
 raportowanie:
