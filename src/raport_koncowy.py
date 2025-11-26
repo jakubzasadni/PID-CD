@@ -379,6 +379,124 @@ class GeneratorRaportuKoncowego:
         print(f"[OK] Wykresy zapisane w: {output_dir}")
         return output_dir
     
+    def utworz_tabele_regulatorow(self, df):
+        """Tworzy tabelę porównawczą typów regulatorów (P, PI, PD, PID)."""
+        html = []
+        html.append("<p>Poniższa tabela pokazuje średnie wyniki dla każdego typu regulatora (P, PI, PD, PID) "
+                   "niezależnie od metody strojenia i modelu obiektu.</p>")
+        
+        # Mapowanie nazw regulatorów
+        def extract_reg_type(regulator_str):
+            """Wyciąga typ regulatora z nazwy pliku."""
+            if 'pid' in regulator_str.lower():
+                return 'PID'
+            elif 'pi' in regulator_str.lower():
+                return 'PI'
+            elif 'pd' in regulator_str.lower():
+                return 'PD'
+            elif regulator_str.lower().startswith('p_'):
+                return 'P'
+            return None
+        
+        # Dodaj kolumnę z typem regulatora
+        df_copy = df.copy()
+        df_copy['typ_regulatora'] = df_copy['regulator'].apply(extract_reg_type)
+        df_copy = df_copy[df_copy['typ_regulatora'].notna()]
+        
+        # Agregacja per typ regulatora
+        stats_per_type = []
+        for reg_type in ['PID', 'PI', 'PD', 'P']:
+            df_type = df_copy[df_copy['typ_regulatora'] == reg_type]
+            if df_type.empty:
+                continue
+            
+            # Oblicz pass rate jako % wszystkich kombinacji z tym typem
+            pass_rate = (df_type['PASS'].sum() / len(df_type) * 100) if len(df_type) > 0 else 0
+            
+            # Średnie metryki (tylko dla PASS=True, żeby nie zaniżać)
+            df_pass = df_type[df_type['PASS']]
+            
+            stats_per_type.append({
+                'Typ': reg_type,
+                'PassRate': pass_rate,
+                'IAE_avg': df_pass['IAE'].mean() if not df_pass.empty else float('nan'),
+                'Mp_avg': df_pass['Mp'].mean() if not df_pass.empty else float('nan'),
+                'ts_avg': df_pass['ts'].mean() if not df_pass.empty else float('nan'),
+                'Count': len(df_type),
+                'PassCount': df_type['PASS'].sum()
+            })
+        
+        # Sortuj według pass rate
+        stats_per_type.sort(key=lambda x: x['PassRate'], reverse=True)
+        
+        # Generuj HTML tabeli
+        html.append("<table border='1'>")
+        html.append("<tr style='background-color: #4CAF50; color: white;'>")
+        html.append("<th>Typ Regulatora</th><th>Pass Rate</th><th>Liczba Kombinacji</th>")
+        html.append("<th>Średnie IAE*</th><th>Średnie Mp%*</th><th>Średnie ts (s)*</th></tr>")
+        
+        for stat in stats_per_type:
+            color = "#d4edda" if stat['PassRate'] >= 60 else "#f8d7da" if stat['PassRate'] < 50 else "#fff3cd"
+            html.append(f"<tr style='background-color: {color};'>")
+            html.append(f"<td><b>{stat['Typ']}</b></td>")
+            html.append(f"<td>{stat['PassRate']:.1f}% ({stat['PassCount']}/{stat['Count']})</td>")
+            html.append(f"<td>{stat['Count']}</td>")
+            
+            # Metryki z obsługą NaN
+            iae_str = f"{stat['IAE_avg']:.2f}" if not pd.isna(stat['IAE_avg']) else "N/A"
+            mp_str = f"{stat['Mp_avg']:.1f}%" if not pd.isna(stat['Mp_avg']) else "N/A"
+            ts_str = f"{stat['ts_avg']:.1f}s" if not pd.isna(stat['ts_avg']) else "N/A"
+            
+            html.append(f"<td>{iae_str}</td>")
+            html.append(f"<td>{mp_str}</td>")
+            html.append(f"<td>{ts_str}</td>")
+            html.append("</tr>")
+        
+        html.append("</table>")
+        html.append("<p><i>*Średnie metryki obliczone tylko dla kombinacji które otrzymały PASS "
+                   "(aby nie obniżać wartości przez nieudane kombinacje).</i></p>")
+        
+        # Dodatkowa tabela: pass rate per model per typ regulatora
+        html.append("<h3>Pass Rate według typu regulatora i modelu</h3>")
+        html.append("<table border='1'>")
+        html.append("<tr style='background-color: #2196F3; color: white;'>")
+        html.append("<th>Typ Regulatora</th>")
+        for model in self.modele:
+            html.append(f"<th>{model.replace('_', ' ').title()}</th>")
+        html.append("</tr>")
+        
+        for reg_type in ['PID', 'PI', 'PD', 'P']:
+            html.append("<tr>")
+            html.append(f"<td><b>{reg_type}</b></td>")
+            
+            for model in self.modele:
+                df_subset = df_copy[(df_copy['typ_regulatora'] == reg_type) & (df_copy['model'] == model)]
+                if df_subset.empty:
+                    html.append("<td>-</td>")
+                else:
+                    pass_rate = (df_subset['PASS'].sum() / len(df_subset) * 100)
+                    count = len(df_subset)
+                    pass_count = df_subset['PASS'].sum()
+                    
+                    # Kolor zależny od pass rate
+                    if pass_rate >= 80:
+                        color = "#d4edda"  # zielony
+                    elif pass_rate >= 60:
+                        color = "#d1ecf1"  # jasnoniebieski
+                    elif pass_rate >= 40:
+                        color = "#fff3cd"  # żółty
+                    else:
+                        color = "#f8d7da"  # czerwony
+                    
+                    html.append(f"<td style='background-color: {color};'>{pass_rate:.0f}% ({pass_count}/{count})</td>")
+            
+            html.append("</tr>")
+        
+        html.append("</table>")
+        html.append("<p><i>Komórki kolorowane: zielony ≥80%, niebieski ≥60%, żółty ≥40%, czerwony &lt;40%.</i></p>")
+        
+        return "\n".join(html)
+    
     def ranking_metod(self, df):
         """Tworzy ranking metod na podstawie wielokryterialnej oceny."""
         print("\n[RANKING] Tworzenie rankingu metod...")
@@ -622,9 +740,15 @@ class GeneratorRaportuKoncowego:
             html.append("<p><i>Kolumna 'Czas (s)' ukryta - brak danych o czasie obliczeń w raportach rozszerzonych.</i></p>")
         html.append("</div>")
         
-        # Sekcja 4: Wykresy
+        # Sekcja 4: Porównanie typów regulatorów
         html.append("<div class='section'>")
-        html.append("<h2>4. Wykresy porównawcze</h2>")
+        html.append("<h2>4. Porównanie typów regulatorów</h2>")
+        html.append(self.utworz_tabele_regulatorow(df))
+        html.append("</div>")
+        
+        # Sekcja 5: Wykresy
+        html.append("<div class='section'>")
+        html.append("<h2>5. Wykresy porównawcze</h2>")
         
         wykresy = [
             "porownanie_IAE_boxplot.png",
@@ -638,7 +762,7 @@ class GeneratorRaportuKoncowego:
         
         html.append("</div>")
         
-        # Sekcja 5: Wnioski
+        # Sekcja 6: Wnioski
         html.append("<div class='section'>")
         wnioski = self.generuj_wnioski(ranking_df, wyniki_stats)
         html.append(wnioski)
@@ -646,7 +770,7 @@ class GeneratorRaportuKoncowego:
         
         # Stopka
         html.append("<div class='section'>")
-        html.append("<h2>5. Dane źródłowe</h2>")
+        html.append("<h2>7. Dane źródłowe</h2>")
         html.append(f"<p>Wszystkie dane źródłowe dostępne w katalogu: <code>{self.wyniki_dir}</code></p>")
         html.append(f"<p>Eksport danych CSV: <code>raport_koncowy_dane.csv</code></p>")
         html.append("</div>")
