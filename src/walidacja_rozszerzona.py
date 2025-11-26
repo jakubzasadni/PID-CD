@@ -150,7 +150,9 @@ def walidacja_rozszerzona(
     # Wczytaj konfigurację
     config = pobierz_konfiguracje()
     scenariusze = config.pobierz_scenariusze_walidacji()
-    progi = config.pobierz_progi_walidacji()
+    progi = config.pobierz_progi_walidacji(model=model_nazwa)  # Progi zależne od modelu
+    
+    print(f"   📏 Progi dla {model_nazwa}: IAE≤{progi['IAE_max']}, Mp≤{progi['przeregulowanie_max']}%, ts≤{progi['czas_ustalania_max']}s")
     
     # Import klas
     ModelClass = dynamiczny_import("modele", model_nazwa)

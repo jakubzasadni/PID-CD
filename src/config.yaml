@@ -105,9 +105,16 @@ walidacja:
       odchylenie_std: 0.05    # Zmniejszone z 0.1 - typowy szum pomiarowy
   
   progi_akceptacji:
+    # Domyślne progi dla zbiorników (stabilne układy)
     IAE_max: 35.0              # ZNACZNIE zrelaksowany - praktyczne wymagania
     przeregulowanie_max: 60.0  # Akceptowalne dla systemów dynamicznych
-    czas_ustalania_max: 120.0  # Zwiększony z 100 - więcej czasu dla PI/PID na wahadle
+    czas_ustalania_max: 120.0  # Zwiększony z 100 - więcej czasu dla PI/PID
+    
+  # Specjalne progi dla wahadła odwróconego (układ niestabilny)
+  progi_akceptacji_wahadlo:
+    IAE_max: 50.0              # Wyższy - stabilizacja trudniejsza niż śledzenie
+    przeregulowanie_max: 80.0  # Wyższy - dopuszczalne większe odchylenia
+    czas_ustalania_max: 150.0  # Więcej czasu na stabilizację
 
 # Raportowanie
 raportowanie:

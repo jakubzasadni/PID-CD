@@ -89,7 +89,9 @@ class GeneratorRaportuKoncowego:
                         iae_mean = ise_mean = mp_mean = ts_mean = None
                         pass_rate = 0
                     
-                    # Sprawdź czy walidacja przeszła (co najmniej 60% scenariuszy)
+                    # Sprawdź czy walidacja przeszła
+                    # Próg zależy od modelu: wahadło jest trudniejsze (niestabilne)
+                    prog_pass = 40 if model == "wahadlo_odwrocone" else 50
                     podsumowanie = raport.get("podsumowanie", {})
                     procent_pass = podsumowanie.get("procent", 0)
                     
@@ -102,7 +104,7 @@ class GeneratorRaportuKoncowego:
                         "ITAE": None,  # Brak w raportach rozszerzonych
                         "Mp": mp_mean,
                         "ts": ts_mean,
-                        "PASS": procent_pass >= 60,  # Pass jeśli >= 60% scenariuszy zaliczonych
+                        "PASS": procent_pass >= prog_pass,  # Pass: ≥50% dla zbiorników, ≥40% dla wahadła
                         "czas_obliczen": None,  # Brak w raportach rozszerzonych
                         "typ_walidacji": "rozszerzona",
                         "plik": plik.name

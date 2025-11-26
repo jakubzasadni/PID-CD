@@ -177,8 +177,18 @@ class Konfiguracja:
         """Pobiera listę scenariuszy walidacji."""
         return self.config['walidacja']['scenariusze']
     
-    def pobierz_progi_walidacji(self) -> Dict[str, float]:
-        """Pobiera progi akceptacji dla walidacji."""
+    def pobierz_progi_walidacji(self, model: str = None) -> Dict[str, float]:
+        """
+        Pobiera progi akceptacji dla walidacji.
+        
+        Args:
+            model: Nazwa modelu (opcjonalne). Jeśli 'wahadlo_odwrocone', zwraca specjalne progi.
+        
+        Returns:
+            Dict z progami: IAE_max, przeregulowanie_max, czas_ustalania_max
+        """
+        if model == "wahadlo_odwrocone" and 'progi_akceptacji_wahadlo' in self.config['walidacja']:
+            return self.config['walidacja']['progi_akceptacji_wahadlo']
         return self.config['walidacja']['progi_akceptacji']
     
     def pobierz_config_raportowania(self) -> Dict[str, Any]:

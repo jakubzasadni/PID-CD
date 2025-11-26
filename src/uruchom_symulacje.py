@@ -259,7 +259,7 @@ def uruchom_symulacje():
 
                 # W trybie strojenie: sprawdź czy przeszła podstawową walidację
                 # W trybie walidacja: uruchom dla wszystkich
-                if TRYB == "strojenie":
+                if tryb == "strojenie":
                     raport_path = os.path.join(out_dir, f"raport_{regulator_nazwa}_{metoda}_{model_nazwa}.json")
                     if os.path.exists(raport_path):
                         with open(raport_path, "r") as f:
