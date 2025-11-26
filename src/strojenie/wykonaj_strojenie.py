@@ -108,23 +108,26 @@ def _uruchom_symulacje_testowa(RegulatorClass, parametry: dict, model_nazwa: str
             ti = parametry.get('Ti', None)
             td = parametry.get('Td', None)
             
-            # Penalizuj Kp bliskie górnej granicy (>80% zakresu)
+            # Penalizuj Kp bliskie GÓRNEJ granicy (>70% zakresu)
             if 'Kp' in zakresy:
                 kp_min, kp_max = zakresy['Kp']
-                if kp > kp_min + 0.8 * (kp_max - kp_min):
-                    kara += w_extreme * ((kp - (kp_min + 0.8*(kp_max - kp_min))) / (0.2*(kp_max - kp_min)))
+                if kp > kp_min + 0.7 * (kp_max - kp_min):
+                    przekroczenie = (kp - (kp_min + 0.7*(kp_max - kp_min))) / (0.3*(kp_max - kp_min))
+                    kara += w_extreme * przekroczenie * przekroczenie  # Kara kwadratowa
             
-            # Penalizuj Ti bliskie górnej granicy (>80% zakresu) 
+            # Penalizuj Ti bliskie GÓRNEJ granicy (>70% zakresu) 
             if ti and 'Ti' in zakresy:
                 ti_min, ti_max = zakresy['Ti']
-                if ti > ti_min + 0.8 * (ti_max - ti_min):
-                    kara += w_extreme * ((ti - (ti_min + 0.8*(ti_max - ti_min))) / (0.2*(ti_max - ti_min)))
+                if ti > ti_min + 0.7 * (ti_max - ti_min):
+                    przekroczenie = (ti - (ti_min + 0.7*(ti_max - ti_min))) / (0.3*(ti_max - ti_min))
+                    kara += w_extreme * przekroczenie * przekroczenie  # Kara kwadratowa
             
-            # Penalizuj Td bliskie górnej granicy (>80% zakresu)
+            # Penalizuj Td bliskie DOLNEJ granicy (<30% zakresu) - chcemy WYŻSZYCH wartości Td
             if td and 'Td' in zakresy:
                 td_min, td_max = zakresy['Td']
-                if td > td_min + 0.8 * (td_max - td_min):
-                    kara += w_extreme * ((td - (td_min + 0.8*(td_max - td_min))) / (0.2*(td_max - td_min)))
+                if td < td_min + 0.3 * (td_max - td_min):
+                    przekroczenie = ((td_min + 0.3*(td_max - td_min)) - td) / (0.3*(td_max - td_min))
+                    kara += w_extreme * przekroczenie * przekroczenie  # Kara kwadratowa za NISKIE Td
         
         return wyniki, kara
         
