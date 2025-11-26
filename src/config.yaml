@@ -11,7 +11,7 @@ zakresy_parametrow:
   # Specyficzne dla modeli (opcjonalne nadpisanie)
   zbiornik_1rz:
     Kp: [1.0, 7.0]     # Zawężone dla zbiornika
-    Ti: [8.0, 30.0]    # Wolniejsza akcja całkująca
+    Ti: [6.0, 20.0]    # Zmniejszone max - zbyt wolne Ti=30 jest nieskuteczne
     Td: [1.2, 5.0]     # Zwiększone minimum - skuteczniejsze tłumienie dla PID
   
   dwa_zbiorniki:
@@ -26,10 +26,10 @@ zakresy_parametrow:
 
 # Wagi funkcji kary (kara = IAE + waga_Mp*Mp + waga_ts*ts + waga_stale_u jeśli u stałe)
 wagi_kary:
-  przeregulowanie: 0.3      # Zrelaksowana - preferuj szybką dynamikę
-  czas_ustalania: 1.5       # Umiarkowana kara - równowaga szybkość/stabilność
+  przeregulowanie: 0.8      # Zwiększona - preferuj wyższe Td dla redukcji Mp
+  czas_ustalania: 1.0       # Zmniejszona - mniej kary za wolniejsze ustalanie
   sterowanie_stale: 1000    # Kara jeśli sterowanie stałe (std(u) < 1e-4)
-  parametry_ekstremalne: 100 # Umiarkowana kara - pozwól na szerszy zakres
+  parametry_ekstremalne: 80  # Zmniejszona - daj więcej swobody optymalizacji
 
 # Gęstość siatki dla przeszukiwania
 gestosc_siatki:

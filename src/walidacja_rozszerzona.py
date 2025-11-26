@@ -163,9 +163,12 @@ def walidacja_rozszerzona(
         nazwa_scenariusza = scenariusz['nazwa']
         print(f"\n  📋 Scenariusz {idx+1}/{len(scenariusze)}: {nazwa_scenariusza}")
         
+        # Zwiększ czas symulacji dla scenariusza z szumem (potrzebuje więcej czasu na stabilizację)
+        czas_sym = 220.0 if scenariusz['typ'] == 'measurement_noise' else 180.0
+        
         # Wykonaj symulację
         try:
-            wynik = symuluj_scenariusz(ModelClass, RegulatorClass, parametry, scenariusz)
+            wynik = symuluj_scenariusz(ModelClass, RegulatorClass, parametry, scenariusz, czas_sym=czas_sym)
             
             # Sprawdź progi
             metryki = wynik['metryki']
