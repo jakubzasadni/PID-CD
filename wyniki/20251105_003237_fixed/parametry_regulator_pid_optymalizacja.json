@@ -1,0 +1,10 @@
+{
+  "regulator": "regulator_pid",
+  "metoda": "optymalizacja",
+  "parametry": {
+    "Kp": 10.0,
+    "Ti": 100.0,
+    "Td": 1.9
+  },
+  "czas_obliczen_s": 9.021148681640625
+}

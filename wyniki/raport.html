@@ -1,0 +1,41 @@
+<html><head><meta charset='UTF-8'>
+
+    <style>
+      body { font-family: Arial, sans-serif; margin: 40px; }
+      h1 { color: #2b547e; }
+      h2 { margin-top: 36px; }
+      table { border-collapse: collapse; width: 100%; margin-top: 14px; }
+      th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+      th { background-color: #f2f2f2; }
+      .pass { background-color: #c7f7c7; }
+      .fail { background-color: #f9c0c0; }
+    </style>
+    
+</head><body>
+<h1>Raport walidacji regulatorów</h1>
+<h2>Wyniki walidacji</h2>
+<table><tr><th>Regulator</th><th>Metoda strojenia</th><th>Model</th><th>IAE</th><th>ISE</th><th>Mp [%]</th><th>ts [s]</th><th>Status</th></tr>
+<tr class='pass'><td>regulator_pid</td><td>optymalizacja</td><td>zbiornik_1rz</td><td>0.70</td><td>0.15</td><td>0.9</td><td>1.5</td><td>✅ PASS</td></tr>
+<tr class='pass'><td>regulator_pid</td><td>siatka</td><td>zbiornik_1rz</td><td>0.70</td><td>0.15</td><td>0.9</td><td>1.5</td><td>✅ PASS</td></tr>
+<tr class='fail'><td>regulator_pid</td><td>ziegler_nichols</td><td>zbiornik_1rz</td><td>4.93</td><td>1.62</td><td>15.5</td><td>34.4</td><td>❌ FAIL</td></tr>
+</table>
+<h2>Podsumowanie regulatorów</h2>
+<table><tr><th>Regulator</th><th>% PASS</th><th>Średni IAE</th><th>Średni ts [s]</th><th>Średni Mp [%]</th></tr>
+<tr><td>regulator_pid</td><td>66.7%</td><td>2.11</td><td>12.45</td><td>5.8</td></tr>
+</table>
+<p><b>Najlepszy regulator (wg średniego IAE):</b> <span style='color:green'>REGULATOR_PID</span></p>
+<h2>Parametry strojenia</h2>
+<table><tr><th>Regulator</th><th>Metoda strojenia</th><th>Kp</th><th>Ti</th><th>Td</th></tr>
+<tr><td>regulator_p</td><td>optymalizacja</td><td>15.0</td><td>-</td><td>-</td></tr>
+<tr><td>regulator_p</td><td>siatka</td><td>15.0</td><td>-</td><td>-</td></tr>
+<tr><td>regulator_p</td><td>ziegler_nichols</td><td>1.2</td><td>-</td><td>-</td></tr>
+<tr><td>regulator_pd</td><td>optymalizacja</td><td>15.0</td><td>-</td><td>0.1</td></tr>
+<tr><td>regulator_pd</td><td>siatka</td><td>8.0</td><td>-</td><td>0.1</td></tr>
+<tr><td>regulator_pd</td><td>ziegler_nichols</td><td>1.2</td><td>-</td><td>3.12</td></tr>
+<tr><td>regulator_pi</td><td>optymalizacja</td><td>1.5</td><td>15.0</td><td>-</td></tr>
+<tr><td>regulator_pi</td><td>siatka</td><td>0.1</td><td>2.0</td><td>-</td></tr>
+<tr><td>regulator_pi</td><td>ziegler_nichols</td><td>1.2</td><td>12.5</td><td>-</td></tr>
+<tr><td>regulator_pid</td><td>optymalizacja</td><td>30.0</td><td>50.0</td><td>0.1</td></tr>
+<tr><td>regulator_pid</td><td>siatka</td><td>30.0</td><td>50.0</td><td>0.1</td></tr>
+<tr><td>regulator_pid</td><td>ziegler_nichols</td><td>6.0</td><td>10.0</td><td>2.5</td></tr>
+</table>

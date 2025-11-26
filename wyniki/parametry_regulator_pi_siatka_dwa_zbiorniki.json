@@ -1,0 +1,11 @@
+{
+  "regulator": "regulator_pi",
+  "metoda": "siatka",
+  "model": "dwa_zbiorniki",
+  "parametry": {
+    "Kp": 0.24,
+    "Ti": 100.0,
+    "Td": null
+  },
+  "czas_obliczen_s": 2.3920371532440186
+}

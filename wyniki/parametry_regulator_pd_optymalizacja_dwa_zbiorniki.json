@@ -1,0 +1,11 @@
+{
+  "regulator": "regulator_pd",
+  "metoda": "optymalizacja",
+  "model": "dwa_zbiorniki",
+  "parametry": {
+    "Kp": 20.0,
+    "Ti": null,
+    "Td": 1.5
+  },
+  "czas_obliczen_s": 2.531527042388916
+}

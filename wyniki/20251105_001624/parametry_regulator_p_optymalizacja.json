@@ -1,0 +1,10 @@
+{
+  "regulator": "regulator_p",
+  "metoda": "optymalizacja",
+  "parametry": {
+    "Kp": 0.1,
+    "Ti": null,
+    "Td": null
+  },
+  "czas_obliczen_s": 1.7068190574645996
+}

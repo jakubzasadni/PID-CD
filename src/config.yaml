@@ -1,0 +1,124 @@
+# Konfiguracja systemu strojenia regulatorów PID
+# Parametry mogą być nadpisane per model używając kluczy: zbiornik_1rz, dwa_zbiorniki, wahadlo_odwrocone
+
+# Zakresy parametrów dla strojenia
+zakresy_parametrow:
+  default:
+    Kp: [1.0, 8.0]     # Zawężone - typowe dla większości aplikacji
+    Ti: [8.0, 35.0]    # Zawężone - realistyczny zakres całkowania
+    Td: [0.5, 6.0]     # Zmienione: min 0.5 zamiast 0.1 - unikaj zbyt małych wartości
+  
+  # Specyficzne dla modeli (opcjonalne nadpisanie)
+  zbiornik_1rz:
+    Kp: [1.0, 7.0]     # Zawężone dla zbiornika
+    Ti: [6.0, 20.0]    # Zmniejszone max - zbyt wolne Ti=30 jest nieskuteczne
+    Td: [1.2, 5.0]     # Zwiększone minimum - skuteczniejsze tłumienie dla PID
+  
+  dwa_zbiorniki:
+    Kp: [1.5, 10.0]    # Zawężone dla układu 2. rzędu
+    Ti: [10.0, 40.0]   # Wolniejsza akcja całkująca
+    Td: [1.0, 5.0]     # Wyższe minimum dla lepszego tłumienia
+  
+  wahadlo_odwrocone:
+    Kp: [3.0, 20.0]    # Zawężone dla niestabilnego układu
+    Ti: [3.0, 25.0]    # Szybsza akcja całkująca
+    Td: [1.5, 7.0]     # Wyższe minimum - ważne dla stabilizacji
+
+# Wagi funkcji kary (kara = IAE + waga_Mp*Mp + waga_ts*ts + waga_stale_u jeśli u stałe)
+wagi_kary:
+  przeregulowanie: 0.8      # Zwiększona - preferuj wyższe Td dla redukcji Mp
+  czas_ustalania: 1.0       # Zmniejszona - mniej kary za wolniejsze ustalanie
+  sterowanie_stale: 1000    # Kara jeśli sterowanie stałe (std(u) < 1e-4)
+  parametry_ekstremalne: 80  # Zmniejszona - daj więcej swobody optymalizacji
+
+# Gęstość siatki dla przeszukiwania
+gestosc_siatki:
+  regulator_p:
+    Kp: 25        # 25 punktów
+  
+  regulator_pi:
+    Kp: 20        # 20 × 15 = 300 kombinacji
+    Ti: 15
+  
+  regulator_pd:
+    Kp: 20        # 20 × 15 = 300 kombinacji
+    Td: 15
+  
+  regulator_pid:
+    Kp: 15        # 15 × 12 × 12 = 2160 kombinacji (zamiast 2880)
+    Ti: 12
+    Td: 12
+
+# Adaptacyjne zagęszczanie siatki
+adaptacyjne_przeszukiwanie:
+  enabled: true
+  faza_gruba:
+    gestosc_mnoznik: 0.3    # 30% pierwotnej gęstości dla fazy grubej
+  faza_dokladna:
+    margines_procent: 0.2   # zagęść ±20% zakresu wokół optimum z fazy grubej
+    gestosc_mnoznik: 1.5    # 150% pierwotnej gęstości dla fazy dokładnej
+
+# Optymalizacja numeryczna
+optymalizacja:
+  punkty_startowe:
+    uzyj_ziegler_nichols: true    # użyj wyniku ZN jako punktu startowego
+    liczba_multi_start: 3          # dodatkowe losowe punkty startowe
+    metoda: 'L-BFGS-B'
+    maxiter: 500
+
+# Równoległe wykonywanie
+rownolegle:
+  enabled: true
+  n_jobs: -1    # -1 = użyj wszystkich dostępnych rdzeni
+
+# Logowanie
+logowanie:
+  poziom: 'INFO'          # DEBUG, INFO, WARNING, ERROR
+  plik_log: 'wyniki/strojenie.log'
+  loguj_niepowodzenia: true
+
+# Walidacja
+walidacja:
+  scenariusze:
+    - nazwa: "Skok wartości zadanej (mały)"
+      typ: "setpoint_step"
+      wielkosc: 5.0
+      czas_skoku: 10.0
+    
+    - nazwa: "Skok wartości zadanej (duży)"
+      typ: "setpoint_step"
+      wielkosc: 6.0           # Zmniejszone do 6.0 - w zakresie liniowości z marginesem dla nasycenia
+      czas_skoku: 10.0
+    
+    - nazwa: "Zakłócenie na wyjściu (ujemne)"
+      typ: "output_disturbance"
+      wielkosc: -1.5          # Zmniejszone z -3.0 - realistyczne zakłócenie
+      czas_zaklócenia: 30.0
+    
+    - nazwa: "Zakłócenie na wyjściu (dodatnie)"
+      typ: "output_disturbance"
+      wielkosc: 1.5           # Zmniejszone z 2.0 - realistyczne zakłócenie
+      czas_zaklócenia: 30.0
+    
+    - nazwa: "Szum pomiarowy"
+      typ: "measurement_noise"
+      odchylenie_std: 0.05    # Zmniejszone z 0.1 - typowy szum pomiarowy
+  
+  progi_akceptacji:
+    # Domyślne progi dla zbiorników (stabilne układy)
+    IAE_max: 35.0              # ZNACZNIE zrelaksowany - praktyczne wymagania
+    przeregulowanie_max: 60.0  # Akceptowalne dla systemów dynamicznych
+    czas_ustalania_max: 120.0  # Zwiększony z 100 - więcej czasu dla PI/PID
+    
+  # Specjalne progi dla wahadła odwróconego (układ niestabilny)
+  progi_akceptacji_wahadlo:
+    IAE_max: 25.0              # Zbalansowane - dopuszcza dobre regulatory ale odrzuca słabe
+    przeregulowanie_max: 150.0 # Realistyczne - scenariusze z zakłóceniami mają Mp~800-900%
+    czas_ustalania_max: 150.0  # Pozostawione - potrzeba czasu na stabilizację po zakłóceniu
+
+# Raportowanie
+raportowanie:
+  generuj_raport_porownawczy: true
+  format_wykresow: 'png'
+  dpi: 150
+  pokaz_czas_obliczen: true

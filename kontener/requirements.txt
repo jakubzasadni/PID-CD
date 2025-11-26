@@ -1,4 +1,9 @@
 numpy
 matplotlib
+seaborn
 scipy
 jinja2
+pyyaml
+tqdm
+joblib
+pandas

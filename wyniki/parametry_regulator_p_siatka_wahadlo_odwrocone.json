@@ -1,0 +1,11 @@
+{
+  "regulator": "regulator_p",
+  "metoda": "siatka",
+  "model": "wahadlo_odwrocone",
+  "parametry": {
+    "Kp": 0.1,
+    "Ti": null,
+    "Td": null
+  },
+  "czas_obliczen_s": 0.26140308380126953
+}

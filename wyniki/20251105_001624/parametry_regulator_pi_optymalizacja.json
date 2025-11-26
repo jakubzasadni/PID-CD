@@ -1,0 +1,10 @@
+{
+  "regulator": "regulator_pi",
+  "metoda": "optymalizacja",
+  "parametry": {
+    "Kp": 0.1,
+    "Ti": 60.0,
+    "Td": null
+  },
+  "czas_obliczen_s": 0.3454742431640625
+}

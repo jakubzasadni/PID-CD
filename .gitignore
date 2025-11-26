@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+
+# Wyniki testowe
+wyniki_test/
+wyniki/raport_test_*/
+wyniki/raport_final_*/
+wyniki/raport_koncowy_*/
+wyniki/raport_poprawiony/
+wyniki/20*/
+wyniki/raport_*.json
+wyniki/raport_rozszerzony_*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+wyniki/strojenie.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tymczasowe pliki
+*.tmp
+*.bak

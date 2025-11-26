@@ -1,0 +1,25 @@
+{
+  "model": "zbiornik_1rz",
+  "regulator": "regulator_pd",
+  "metoda": "siatka",
+  "parametry": {
+    "Kp": 35.87,
+    "Ti": null,
+    "Td": 0.05
+  },
+  "metryki": {
+    "IAE": 0.24947585062383756,
+    "ISE": 0.10278595487519611,
+    "ITAE": 0.07550366561609308,
+    "przeregulowanie": 0.0,
+    "czas_ustalania": 1.2000000000000002,
+    "czas_narastania": 0.6673431037990779
+  },
+  "progi": {
+    "ts": 120.0,
+    "IAE": 50.0,
+    "Mp": 15.0
+  },
+  "PASS": true,
+  "niezaliczone": []
+}

@@ -1,0 +1,25 @@
+{
+  "model": "wahadlo_odwrocone",
+  "regulator": "regulator_pd",
+  "metoda": "siatka",
+  "parametry": {
+    "Kp": 35.87,
+    "Ti": null,
+    "Td": 0.05
+  },
+  "metryki": {
+    "IAE": 0.0007133130509402729,
+    "ISE": 8.166417806874465e-06,
+    "ITAE": 2.026721321586376e-05,
+    "przeregulowanie": 0.0,
+    "czas_ustalania": 0.11,
+    "czas_narastania": 0.06872245819880354
+  },
+  "progi": {
+    "ts": 120.0,
+    "IAE": 10.0,
+    "Mp": 50.0
+  },
+  "PASS": true,
+  "niezaliczone": []
+}

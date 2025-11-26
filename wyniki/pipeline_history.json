@@ -1,0 +1,53 @@
+[
+  {
+    "start_time": "2025-11-06T11:03:42.627993",
+    "etapy": {
+      "Test strojenia": {
+        "czas_s": 1.0,
+        "status": "success",
+        "koniec": "2025-11-06T11:03:43.630992"
+      },
+      "Test walidacji": {
+        "czas_s": 0.5,
+        "status": "success",
+        "koniec": "2025-11-06T11:03:44.131876"
+      },
+      "Test raportowania": {
+        "czas_s": 0.3,
+        "status": "success",
+        "koniec": "2025-11-06T11:03:44.432881"
+      }
+    },
+    "status": "success",
+    "end_time": "2025-11-06T11:03:44.432881",
+    "total_time_s": 1.8
+  },
+  {
+    "start_time": "2025-11-25T18:49:08.020301",
+    "etapy": {
+      "Strojenie regulatorów": {
+        "czas_s": 31.5,
+        "status": "success",
+        "koniec": "2025-11-25T18:49:39.523968"
+      },
+      "Walidacja na modelach": {
+        "czas_s": 11.11,
+        "status": "success",
+        "koniec": "2025-11-25T18:49:50.633792"
+      },
+      "Ocena i porównanie metod": {
+        "czas_s": 0.03,
+        "status": "success",
+        "koniec": "2025-11-25T18:49:50.668747"
+      },
+      "Generowanie raportu końcowego": {
+        "czas_s": 5.3,
+        "status": "success",
+        "koniec": "2025-11-25T18:49:55.971312"
+      }
+    },
+    "status": "success",
+    "end_time": "2025-11-25T18:49:55.971342",
+    "total_time_s": 47.95
+  }
+]

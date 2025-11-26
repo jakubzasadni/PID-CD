@@ -1,0 +1,27 @@
+{
+  "model": "zbiornik_1rz",
+  "regulator": "regulator_pi",
+  "metoda": "ziegler_nichols",
+  "parametry": {
+    "Kp": 6.75,
+    "Ti": 3.32,
+    "Td": null
+  },
+  "metryki": {
+    "IAE": 1.7572472411744722,
+    "ISE": 0.5934663225545661,
+    "ITAE": 6.196053633478979,
+    "przeregulowanie": 17.538677008649785,
+    "czas_ustalania": 11.4,
+    "czas_narastania": 1.6717213567084577
+  },
+  "progi": {
+    "ts": 120.0,
+    "IAE": 50.0,
+    "Mp": 15.0
+  },
+  "PASS": false,
+  "niezaliczone": [
+    "przeregulowanie"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "regulator": "regulator_pi",
+  "metoda": "siatka",
+  "parametry": {
+    "Kp": 0.1,
+    "Ti": 30.0,
+    "Td": null
+  },
+  "czas_obliczen_s": 8.862964153289795
+}

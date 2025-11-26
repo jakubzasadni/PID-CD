@@ -1,0 +1,11 @@
+{
+  "regulator": "regulator_pd",
+  "metoda": "optymalizacja",
+  "model": "zbiornik_1rz",
+  "parametry": {
+    "Kp": 30.0,
+    "Ti": null,
+    "Td": 0.1
+  },
+  "czas_obliczen_s": 0.7726643085479736
+}

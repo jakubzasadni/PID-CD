@@ -1,0 +1,25 @@
+{
+  "model": "dwa_zbiorniki",
+  "regulator": "regulator_pd",
+  "metoda": "ziegler_nichols",
+  "parametry": {
+    "Kp": 9.0,
+    "Ti": null,
+    "Td": 0.5
+  },
+  "metryki": {
+    "IAE": 3.0647047552808995,
+    "ISE": 1.7014498816839523,
+    "ITAE": 10.171201502258942,
+    "przeregulowanie": 19.280233625405582,
+    "czas_ustalania": 14.65,
+    "czas_narastania": 2.7788406438543953
+  },
+  "progi": {
+    "ts": 120.0,
+    "IAE": 80.0,
+    "Mp": 20.0
+  },
+  "PASS": true,
+  "niezaliczone": []
+}

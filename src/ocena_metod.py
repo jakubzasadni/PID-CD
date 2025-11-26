@@ -18,10 +18,10 @@ def _dash(x):
 def ocena_metod(wyniki_dir: str):
     wyniki_path = Path(wyniki_dir)
 
-    # --- Raporty z walidacji ---
-    raporty = sorted([f for f in wyniki_path.glob("raport_*.json")])
+    # --- Raporty z walidacji (tylko standardowe, bez rozszerzonych) ---
+    raporty = sorted([f for f in wyniki_path.glob("raport_*.json") if "rozszerzony" not in f.name])
     if not raporty:
-        print("⚠️ Brak raportów do oceny w katalogu:", wyniki_path)
+        print("[UWAGA] Brak raportów do oceny w katalogu:", wyniki_path)
         return
 
     dane = []
@@ -38,7 +38,7 @@ def ocena_metod(wyniki_dir: str):
     statystyki = {}
     for reg in regulatory:
         wyniki_r = [r for r in dane if r["regulator"] == reg]
-        passy = [r for r in wyniki_r if r["PASS"]]
+        passy = [r for r in wyniki_r if r.get("PASS", False)]
         proc_pass = 100 * len(passy) / len(wyniki_r) if wyniki_r else 0.0
         avg_iae = mean([r["metryki"]["IAE"] for r in wyniki_r]) if wyniki_r else float("inf")
         avg_ts  = mean([r["metryki"]["czas_ustalania"] for r in wyniki_r]) if wyniki_r else float("inf")
@@ -48,15 +48,15 @@ def ocena_metod(wyniki_dir: str):
     najlepszy_regulator = min(statystyki.keys(), key=lambda r: statystyki[r]["avg_IAE"])
 
     # --- Lista modeli do wdrożenia (PASS) ---
-    passed_models = sorted(set([r["model"] for r in dane if r["PASS"]]))
+    passed_models = sorted(set([r["model"] for r in dane if r.get("PASS", False)]))
     if passed_models:
         with open(wyniki_path / "passed_models.txt", "w") as f:
             for m in passed_models:
                 f.write(m + "\n")
-        print("✅ Utworzono listę modeli do wdrożenia:", wyniki_path / "passed_models.txt")
+        print("[OK] Utworzono listę modeli do wdrożenia:", wyniki_path / "passed_models.txt")
         print("Modele:", ", ".join(passed_models))
     else:
-        print("❌ Żaden model nie spełnił progów jakości — brak passed_models.txt")
+        print("[X] Żaden model nie spełnił progów jakości — brak passed_models.txt")
 
     # --- HTML ---
     html = []
@@ -82,13 +82,14 @@ def ocena_metod(wyniki_dir: str):
     html.append("<table><tr><th>Regulator</th><th>Metoda strojenia</th><th>Model</th>"
                 "<th>IAE</th><th>ISE</th><th>Mp [%]</th><th>ts [s]</th><th>Status</th></tr>")
     for r in dane:
-        cls = "pass" if r["PASS"] else "fail"
+        passed = r.get("PASS", False)
+        cls = "pass" if passed else "fail"
         m = r["metryki"]
         html.append(
             f"<tr class='{cls}'><td>{r['regulator']}</td><td>{r['metoda']}</td><td>{r['model']}</td>"
             f"<td>{m['IAE']:.2f}</td><td>{m['ISE']:.2f}</td>"
             f"<td>{m['przeregulowanie']:.1f}</td><td>{m['czas_ustalania']:.1f}</td>"
-            f"<td>{'✅ PASS' if r['PASS'] else '❌ FAIL'}</td></tr>"
+            f"<td>{'[OK] PASS' if passed else '[X] FAIL'}</td></tr>"
         )
     html.append("</table>")
 
@@ -124,8 +125,8 @@ def ocena_metod(wyniki_dir: str):
     with open(wyniki_path / "najlepszy_regulator.json", "w") as f:
         json.dump({"najlepszy_regulator": najlepszy_regulator, "statystyki": statystyki}, f, indent=2)
 
-    print(f"✅ Raport HTML zapisano jako: {raport_html}")
-    print(f"✅ Najlepszy regulator: {najlepszy_regulator.upper()} (średni IAE={statystyki[najlepszy_regulator]['avg_IAE']:.2f})")
+    print(f"[OK] Raport HTML zapisano jako: {raport_html}")
+    print(f"[OK] Najlepszy regulator: {najlepszy_regulator.upper()} (średni IAE={statystyki[najlepszy_regulator]['avg_IAE']:.2f})")
 
 
 if __name__ == "__main__":
