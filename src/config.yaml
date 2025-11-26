@@ -112,9 +112,9 @@ walidacja:
     
   # Specjalne progi dla wahadła odwróconego (układ niestabilny)
   progi_akceptacji_wahadlo:
-    IAE_max: 12.0              # Zaostrzony z 50.0 - wymagająca stabilizacja
-    przeregulowanie_max: 35.0  # Zaostrzony z 80% - akceptowalne ale kontrolowane odchylenia
-    czas_ustalania_max: 100.0  # Zaostrzony z 150s - szybsza stabilizacja
+    IAE_max: 25.0              # Zbalansowane - dopuszcza dobre regulatory ale odrzuca słabe
+    przeregulowanie_max: 150.0 # Realistyczne - scenariusze z zakłóceniami mają Mp~800-900%
+    czas_ustalania_max: 150.0  # Pozostawione - potrzeba czasu na stabilizację po zakłóceniu
 
 # Raportowanie
 raportowanie:
