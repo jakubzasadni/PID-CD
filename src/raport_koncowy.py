@@ -388,13 +388,15 @@ class GeneratorRaportuKoncowego:
         # Mapowanie nazw regulatorów
         def extract_reg_type(regulator_str):
             """Wyciąga typ regulatora z nazwy pliku."""
-            if 'pid' in regulator_str.lower():
+            regulator_lower = regulator_str.lower()
+            # Ważna kolejność: najpierw długsze nazwy (PID, PI, PD), potem P
+            if 'pid' in regulator_lower:
                 return 'PID'
-            elif 'pi' in regulator_str.lower():
+            elif 'pi' in regulator_lower and 'pid' not in regulator_lower:
                 return 'PI'
-            elif 'pd' in regulator_str.lower():
+            elif 'pd' in regulator_lower:
                 return 'PD'
-            elif regulator_str.lower().startswith('p_'):
+            elif 'regulator_p' in regulator_lower or regulator_lower == 'p':
                 return 'P'
             return None
         
