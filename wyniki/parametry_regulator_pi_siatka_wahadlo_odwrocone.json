@@ -3,9 +3,9 @@
   "metoda": "siatka",
   "model": "wahadlo_odwrocone",
   "parametry": {
-    "Kp": 0.1,
-    "Ti": 30.0,
+    "Kp": 3.47,
+    "Ti": 25.0,
     "Td": null
   },
-  "czas_obliczen_s": 11.810784816741943
+  "czas_obliczen_s": 13.688040971755981
 }

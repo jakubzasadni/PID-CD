@@ -3,9 +3,9 @@
   "metoda": "siatka",
   "model": "dwa_zbiorniki",
   "parametry": {
-    "Kp": 0.24,
-    "Ti": 100.0,
+    "Kp": 10.0,
+    "Ti": 40.0,
     "Td": null
   },
-  "czas_obliczen_s": 2.3920371532440186
+  "czas_obliczen_s": 2.7173681259155273
 }

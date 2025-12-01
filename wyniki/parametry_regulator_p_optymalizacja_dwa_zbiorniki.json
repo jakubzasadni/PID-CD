@@ -3,9 +3,9 @@
   "metoda": "optymalizacja",
   "model": "dwa_zbiorniki",
   "parametry": {
-    "Kp": 1.17,
+    "Kp": 2.5,
     "Ti": null,
     "Td": null
   },
-  "czas_obliczen_s": 1.8354952335357666
+  "czas_obliczen_s": 0.5767176151275635
 }

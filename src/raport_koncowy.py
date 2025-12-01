@@ -114,12 +114,15 @@ class GeneratorRaportuKoncowego:
         
         print(f"[INFO] Zebrano {len(self.dane)} raportów rozszerzonych (5 scenariuszy każdy)")
         
-        # KROK 2: Uzupełnij brakujące kombinacje raportami podstawowymi (1 test)
-        for pattern in ["raport_regulator_*.json", "*/raport_regulator_*.json"]:
-            for plik in self.wyniki_dir.glob(pattern):
-                # Pomiń pliki rozszerzone
-                if "rozszerzony" in plik.name:
-                    continue
+        # KROK 2: NIE dodawaj podstawowych raportów - mieszają statystyki!
+        # Tylko raporty rozszerzone zapewniają spójną metodologię (5 scenariuszy)
+        # Brakujące kombinacje będą oznaczone jako N/A w analizie
+        if False:  # Wyłączam dodawanie podstawowych raportów
+            for pattern in ["raport_regulator_*.json", "*/raport_regulator_*.json"]:
+                for plik in self.wyniki_dir.glob(pattern):
+                    # Pomiń pliki rozszerzone
+                    if "rozszerzony" in plik.name:
+                        continue
                     
                 try:
                     with open(plik, "r", encoding="utf-8") as f:
@@ -549,14 +552,63 @@ class GeneratorRaportuKoncowego:
         
         return ranking_df
     
-    def generuj_wnioski(self, ranking_df, wyniki_stats):
+    def ranking_globalny_metod(self, df):
+        """Tworzy globalny ranking metod (uśredniony po wszystkich modelach)."""
+        print("\n[RANKING GLOBALNY] Tworzenie globalnego rankingu metod...")
+        
+        ranking_globalny = []
+        
+        for metoda in self.metody:
+            df_metoda = df[df["metoda"] == metoda]
+            if df_metoda.empty:
+                continue
+            
+            # Średnie metryki po wszystkich modelach i regulatorach
+            iae_mean = df_metoda["IAE"].mean() if not df_metoda["IAE"].isna().all() else None
+            mp_mean = df_metoda["Mp"].mean() if not df_metoda["Mp"].isna().all() else None
+            ts_mean = df_metoda["ts"].mean() if not df_metoda["ts"].isna().all() else None
+            pass_rate = (df_metoda["PASS"].sum() / len(df_metoda) * 100) if len(df_metoda) > 0 else 0
+            czas = df_metoda["czas_obliczen"].mean() if not df_metoda["czas_obliczen"].isna().all() else None
+            
+            # Funkcja oceny (wielokryterialna)
+            ocena = (
+                0.4 * (100 - pass_rate) +  # waga 0.4 dla niezawodności
+                0.3 * min((iae_mean or 999) / 10, 100) +  # waga 0.3 dla IAE
+                0.2 * min((mp_mean or 999) / 2, 100) +  # waga 0.2 dla Mp
+                0.1 * min((czas or 0) / 10, 100)  # waga 0.1 dla czasu
+            )
+            
+            ranking_globalny.append({
+                "metoda": metoda,
+                "pass_rate": pass_rate,
+                "IAE": iae_mean,
+                "Mp": mp_mean,
+                "ts": ts_mean,
+                "czas_s": czas,
+                "ocena": ocena,
+                "liczba_testow": len(df_metoda)
+            })
+        
+        ranking_globalny_df = pd.DataFrame(ranking_globalny)
+        ranking_globalny_df = ranking_globalny_df.sort_values("ocena")  # Im niższa ocena tym lepiej
+        
+        return ranking_globalny_df
+    
+    def generuj_wnioski(self, ranking_df, ranking_globalny_df, wyniki_stats):
         """Generuje automatyczne wnioski na podstawie analizy."""
         wnioski = []
         
-        wnioski.append("<h2>Wnioski i rekomendacje</h2>")
         wnioski.append("<ol>")
         
-        # Najlepsza metoda globalnie
+        # Najlepsza metoda globalnie (NOWY)
+        if not ranking_globalny_df.empty:
+            najlepsza = ranking_globalny_df.iloc[0]
+            wnioski.append(f"<li><b>Najlepsza metoda globalnie:</b> "
+                          f"<b>{najlepsza['metoda'].replace('_', ' ').title()}</b> "
+                          f"(Pass rate: {najlepsza['pass_rate']:.1f}%, IAE: {najlepsza['IAE']:.2f}, "
+                          f"Mp: {najlepsza['Mp']:.1f}%, Ocena: {najlepsza['ocena']:.2f})</li>")
+        
+        # Najlepsza metoda per model
         if not ranking_df.empty:
             top3 = ranking_df.head(3)
             wnioski.append(f"<li><b>Najlepsze kombinacje Model+Metoda:</b><ul>")
@@ -639,7 +691,7 @@ class GeneratorRaportuKoncowego:
         
         return "\n".join(wnioski)
     
-    def generuj_raport_html(self, df, wyniki_stats, ranking_df, output_file):
+    def generuj_raport_html(self, df, wyniki_stats, ranking_df, ranking_globalny_df, output_file):
         """Generuje końcowy raport HTML."""
         print(f"\n📄 Generowanie raportu HTML: {output_file}")
         
@@ -707,9 +759,55 @@ class GeneratorRaportuKoncowego:
         html.append(tabele)
         html.append("</div>")
         
-        # Sekcja 3: Ranking
+        # Sekcja 3: Ranking globalny metod (NOWY)
         html.append("<div class='section'>")
-        html.append("<h2>3. Ranking metod (wielokryterialna ocena)</h2>")
+        html.append("<h2>3. Ranking globalny metod strojenia</h2>")
+        html.append("<p>Poniższa tabela przedstawia globalne porównanie metod strojenia (uśrednione po wszystkich modelach i regulatorach).</p>")
+        
+        # Sprawdź czy są dane o czasie
+        has_time_data_global = not ranking_globalny_df["czas_s"].isna().all() and (ranking_globalny_df["czas_s"] > 0).any()
+        
+        html.append("<table border='1'>")
+        html.append("<tr style='background-color: #4CAF50; color: white;'>")
+        html.append("<th>Pozycja</th><th>Metoda</th><th>Pass Rate [%]</th>")
+        html.append("<th>IAE (śr)</th><th>Mp [%]</th><th>ts [s]</th>")
+        if has_time_data_global:
+            html.append("<th>Czas [s]</th>")
+        html.append("<th>Ocena*</th><th>Liczba testów</th></tr>")
+        
+        for idx, (i, row) in enumerate(ranking_globalny_df.iterrows(), 1):
+            medal = "🥇" if idx == 1 else ("🥈" if idx == 2 else ("🥉" if idx == 3 else ""))
+            
+            # Kolor wiersza zależny od pass rate
+            if row['pass_rate'] >= 60:
+                row_color = "#d4edda"  # zielony
+            elif row['pass_rate'] >= 40:
+                row_color = "#fff3cd"  # żółty
+            else:
+                row_color = "#f8d7da"  # czerwony
+            
+            html.append(f"<tr style='background-color: {row_color};'>")
+            html.append(f"<td>{medal} {idx}</td>")
+            html.append(f"<td><b>{row['metoda'].replace('_', ' ').title()}</b></td>")
+            html.append(f"<td>{row['pass_rate']:.1f}%</td>")
+            html.append(f"<td>{row['IAE']:.2f}</td>")
+            html.append(f"<td>{row['Mp']:.1f}%</td>")
+            html.append(f"<td>{row['ts']:.1f}s</td>")
+            if has_time_data_global:
+                czas_str = f"{row['czas_s']:.1f}s" if pd.notna(row['czas_s']) else "-"
+                html.append(f"<td>{czas_str}</td>")
+            html.append(f"<td>{row['ocena']:.2f}</td>")
+            html.append(f"<td>{int(row['liczba_testow'])}</td>")
+            html.append("</tr>")
+        
+        html.append("</table>")
+        html.append("<p><i>*Ocena = funkcja wielokryterialna (wagi: pass_rate=0.4, IAE=0.3, Mp=0.2, czas=0.1). Niższa wartość = lepsza.</i></p>")
+        html.append("<p><i>Pass Rate = procent zaliczonych kombinacji (regulator+model) dla danej metody.</i></p>")
+        html.append("</div>")
+        
+        # Sekcja 4: Ranking szczegółowy per model
+        html.append("<div class='section'>")
+        html.append("<h2>4. Ranking szczegółowy (per model)</h2>")
         
         # Sprawdź czy są dane o czasie
         has_time_data = not ranking_df["czas_s"].isna().all() and (ranking_df["czas_s"] > 0).any()
@@ -742,15 +840,15 @@ class GeneratorRaportuKoncowego:
             html.append("<p><i>Kolumna 'Czas (s)' ukryta - brak danych o czasie obliczeń w raportach rozszerzonych.</i></p>")
         html.append("</div>")
         
-        # Sekcja 4: Porównanie typów regulatorów
+        # Sekcja 5: Porównanie typów regulatorów
         html.append("<div class='section'>")
-        html.append("<h2>4. Porównanie typów regulatorów</h2>")
+        html.append("<h2>5. Porównanie typów regulatorów</h2>")
         html.append(self.utworz_tabele_regulatorow(df))
         html.append("</div>")
         
-        # Sekcja 5: Wykresy
+        # Sekcja 6: Wykresy
         html.append("<div class='section'>")
-        html.append("<h2>5. Wykresy porównawcze</h2>")
+        html.append("<h2>6. Wykresy porównawcze</h2>")
         
         wykresy = [
             "porownanie_IAE_boxplot.png",
@@ -764,15 +862,16 @@ class GeneratorRaportuKoncowego:
         
         html.append("</div>")
         
-        # Sekcja 6: Wnioski
+        # Sekcja 7: Wnioski
         html.append("<div class='section'>")
-        wnioski = self.generuj_wnioski(ranking_df, wyniki_stats)
+        html.append("<h2>7. Wnioski i rekomendacje</h2>")
+        wnioski = self.generuj_wnioski(ranking_df, ranking_globalny_df, wyniki_stats)
         html.append(wnioski)
         html.append("</div>")
         
         # Stopka
         html.append("<div class='section'>")
-        html.append("<h2>7. Dane źródłowe</h2>")
+        html.append("<h2>8. Dane źródłowe</h2>")
         html.append(f"<p>Wszystkie dane źródłowe dostępne w katalogu: <code>{self.wyniki_dir}</code></p>")
         html.append(f"<p>Eksport danych CSV: <code>raport_koncowy_dane.csv</code></p>")
         html.append("</div>")
@@ -812,18 +911,22 @@ class GeneratorRaportuKoncowego:
         # 2. Analiza statystyczna
         wyniki_stats = self.analiza_statystyczna(df)
         
-        # 3. Ranking
+        # 3. Ranking szczegółowy (per model)
         ranking_df = self.ranking_metod(df)
         
-        # 4. Wykresy
+        # 4. Ranking globalny (per metoda)
+        ranking_globalny_df = self.ranking_globalny_metod(df)
+        
+        # 5. Wykresy
         self.utworz_wykresy(df, output_dir)
         
-        # 5. Raport HTML
-        self.generuj_raport_html(df, wyniki_stats, ranking_df, output_dir / "raport_koncowy.html")
+        # 6. Raport HTML
+        self.generuj_raport_html(df, wyniki_stats, ranking_df, ranking_globalny_df, output_dir / "raport_koncowy.html")
         
-        # 6. Eksport CSV
+        # 7. Eksport CSV
         self.eksportuj_csv(df, output_dir / "raport_koncowy_dane.csv")
         self.eksportuj_csv(ranking_df, output_dir / "raport_koncowy_ranking.csv")
+        self.eksportuj_csv(ranking_globalny_df, output_dir / "raport_koncowy_ranking_globalny.csv")
         
         print("\n" + "=" * 60)
         print(f"[OK] RAPORT KOŃCOWY WYGENEROWANY: {output_dir}")

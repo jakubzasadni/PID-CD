@@ -3,9 +3,9 @@
   "metoda": "optymalizacja",
   "model": "wahadlo_odwrocone",
   "parametry": {
-    "Kp": 18.52,
-    "Ti": 30.0,
-    "Td": 0.07
+    "Kp": 9.0,
+    "Ti": 3.0,
+    "Td": 1.5
   },
-  "czas_obliczen_s": 48.138835191726685
+  "czas_obliczen_s": 11.972697019577026
 }
