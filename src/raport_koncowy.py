@@ -114,15 +114,12 @@ class GeneratorRaportuKoncowego:
         
         print(f"[INFO] Zebrano {len(self.dane)} raportów rozszerzonych (5 scenariuszy każdy)")
         
-        # KROK 2: NIE dodawaj podstawowych raportów - mieszają statystyki!
-        # Tylko raporty rozszerzone zapewniają spójną metodologię (5 scenariuszy)
-        # Brakujące kombinacje będą oznaczone jako N/A w analizie
-        if False:  # Wyłączam dodawanie podstawowych raportów
-            for pattern in ["raport_regulator_*.json", "*/raport_regulator_*.json"]:
-                for plik in self.wyniki_dir.glob(pattern):
-                    # Pomiń pliki rozszerzone
-                    if "rozszerzony" in plik.name:
-                        continue
+        # KROK 2: Uzupełnij brakujące kombinacje raportami podstawowymi (1 test)
+        for pattern in ["raport_regulator_*.json", "*/raport_regulator_*.json"]:
+            for plik in self.wyniki_dir.glob(pattern):
+                # Pomiń pliki rozszerzone
+                if "rozszerzony" in plik.name:
+                    continue
                     
                 try:
                     with open(plik, "r", encoding="utf-8") as f:
@@ -750,7 +747,7 @@ class GeneratorRaportuKoncowego:
         html.append("<li>📡 <b>Szum pomiarowy</b> (σ=0.5) - odporność na błędy pomiarowe</li>")
         html.append("</ul>")
         html.append("<p><b>Pass rate</b> = procent scenariuszy zaliczonych (próg: IAE, Mp, ts w granicach norm). "
-                   "Kombinacja otrzymuje <span class='pass'>PASS</span> gdy ≥60% scenariuszy spełnia kryteria.</p>")
+                   "Kombinacja otrzymuje <span class='pass'>PASS</span> gdy ≥50% scenariuszy (zbiorniki) lub ≥40% (wahadło) spełnia kryteria.</p>")
         html.append("</div>")
         
         # Sekcja 2: Tabele porównawcze
