@@ -925,6 +925,18 @@ class GeneratorRaportuKoncowego:
         self.eksportuj_csv(ranking_df, output_dir / "raport_koncowy_ranking.csv")
         self.eksportuj_csv(ranking_globalny_df, output_dir / "raport_koncowy_ranking_globalny.csv")
         
+        # Generuj listę modeli, które przeszły walidację (do wdrożenia GitOps)
+        passed_models = sorted(set([row['model'] for _, row in df.iterrows() if row['PASS']]))
+        if passed_models:
+            passed_file = self.wyniki_dir / "passed_models.txt"
+            with open(passed_file, 'w', encoding='utf-8') as f:
+                for model in passed_models:
+                    f.write(f"{model}\n")
+            print(f"\n[OK] Utworzono listę modeli do wdrożenia: {passed_file}")
+            print(f"    Modele: {', '.join(passed_models)}")
+        else:
+            print("\n[UWAGA] Żaden model nie spełnił progów jakości - brak passed_models.txt")
+        
         print("\n" + "=" * 60)
         print(f"[OK] RAPORT KOŃCOWY WYGENEROWANY: {output_dir}")
         print("=" * 60)

@@ -107,15 +107,20 @@ def ocena_metod(wyniki_dir: str):
     html.append("<table><tr><th>Regulator</th><th>Metoda strojenia</th><th>Kp</th><th>Ti</th><th>Td</th></tr>")
     param_files = sorted(wyniki_path.glob("parametry_*.json"))
     for pf in param_files:
-        with open(pf, "r") as f:
-            blob = json.load(f)
-        reg = blob.get("regulator", "")
-        met = blob.get("metoda", "")
-        p = blob.get("parametry", {})
-        html.append(
-            f"<tr><td>{reg}</td><td>{met}</td>"
-            f"<td>{_dash(p.get('Kp'))}</td><td>{_dash(p.get('Ti'))}</td><td>{_dash(p.get('Td'))}</td></tr>"
-        )
+        try:
+            with open(pf, "r", encoding="utf-8") as f:
+                blob = json.load(f)
+            reg = blob.get("regulator", "")
+            met = blob.get("metoda", "")
+            p = blob.get("parametry", {})
+            html.append(
+                f"<tr><td>{reg}</td><td>{met}</td>"
+                f"<td>{_dash(p.get('Kp'))}</td><td>{_dash(p.get('Ti'))}</td><td>{_dash(p.get('Td'))}</td></tr>"
+            )
+        except json.JSONDecodeError as e:
+            print(f"[UWAGA] Błąd parsowania {pf.name}: {e}")
+            print(f"   Pomijam uszkodzony plik")
+            continue
     html.append("</table>")
 
     raport_html = wyniki_path / "raport.html"
